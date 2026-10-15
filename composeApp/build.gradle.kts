@@ -730,6 +730,23 @@ val windowsPlayerBridgePdb = layout.buildDirectory.file("native/windows/player_b
 val windowsPlayerBridgeObj = layout.buildDirectory.file("native/windows/player_bridge.obj")
 val windowsPlayerBridgeScript = layout.buildDirectory.file("native/windows/build-player-bridge.bat")
 val windowsPlayerRuntimeOutput = layout.buildDirectory.dir("native/windows-runtime")
+val windowsSubtitleAppResources = layout.buildDirectory.dir("subtitle-sync/app-resources")
+val buildWindowsSubtitleSync = tasks.register<Exec>("buildWindowsSubtitleSync") {
+    group = "distribution"
+    description = "Build and self-test the private Windows subtitle synchronization runtime."
+    notCompatibleWithConfigurationCache("Builds a host-local Python/FFmpeg runtime for Windows packaging.")
+    onlyIf { isWindowsHost }
+    val script = rootProject.layout.projectDirectory.file("scripts/build_windows_subtitle_sync.py")
+    inputs.file(script)
+    inputs.file(rootProject.layout.projectDirectory.file("scripts/subtitle-sync-requirements.txt"))
+    inputs.dir(rootProject.layout.projectDirectory.dir("scripts/pyinstaller-hooks"))
+    inputs.file(layout.projectDirectory.file("src/desktopMain/resources/nuvio/audio_sync_worker.py"))
+    val output = windowsSubtitleAppResources.map { it.dir("windows/subtitle-sync") }
+    outputs.dir(output)
+    val python = providers.gradleProperty("nuvio.subtitleSync.buildPython").orNull
+    val command = if (python.isNullOrBlank()) listOf("py", "-3.13") else listOf(python)
+    commandLine(command + listOf(script.asFile.absolutePath, "--output", output.get().asFile.absolutePath))
+}
 if (isWindowsHost) {
     windowsPlayerBridgeOutput.get().asFile.parentFile.mkdirs()
 }
@@ -986,6 +1003,9 @@ tasks.withType<Jar>().configureEach {
 tasks.matching { it.name == "prepareAppResources" }.configureEach {
     if (isMacHost) {
         dependsOn(prepareMacosPlayerAppResources)
+    }
+    if (isWindowsHost) {
+        dependsOn(buildWindowsSubtitleSync)
     }
 }
 
@@ -1282,6 +1302,9 @@ compose.desktop {
             vendor = "Nuvio Media"
             if (isMacHost) {
                 appResourcesRootDir.set(macosPlayerAppResourcesRoot)
+            }
+            if (isWindowsHost) {
+                appResourcesRootDir.set(windowsSubtitleAppResources)
             }
             modules(
                 "java.instrument",

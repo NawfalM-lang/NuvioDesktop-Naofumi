@@ -1,0 +1,31 @@
+name: Windows bundled subtitle runtime
+
+on:
+  push:
+    branches: [bundle-windows-subtitle-sync]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Build and test without system Python or FFmpeg on PATH
+        run: |
+          python scripts/test_windows_subtitle_sync.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/build_windows_subtitle_sync.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-x64-subtitle-runtime
+          path: composeApp/build/subtitle-sync/app-resources/windows/subtitle-sync/
+          if-no-files-found: error
+          retention-days: 14
