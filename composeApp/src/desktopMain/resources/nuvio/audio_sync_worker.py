@@ -121,6 +121,9 @@ def to_srt(source, dest, ffmpeg=None):
 
 
 def normalize_video(value):
+    # urlsplit treats a Windows drive letter as a URI scheme (e.g. "c").
+    if re.match(r'^[A-Za-z]:[\\/]', value) and pathlib.Path(value).is_file():
+        return value
     p = urllib.parse.urlsplit(value)
     if p.scheme in ('http', 'https'):
         return value
