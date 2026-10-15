@@ -8,11 +8,15 @@ internal const val SIMKL_AUTHORIZATION_TIMEOUT_MS = 5L * 60L * 1_000L
 internal fun parseSimklAuthCallback(
     callbackUrl: String,
     redirectUri: String,
+    requireV2Issuer: Boolean = false,
 ): SimklAuthCallback {
     if (callbackUrl != redirectUri && !callbackUrl.startsWith("$redirectUri?")) {
         return SimklAuthCallback.NotSimkl
     }
     val parsed = runCatching { Url(callbackUrl) }.getOrNull() ?: return SimklAuthCallback.Invalid
+    if (requireV2Issuer && parsed.parameters["iss"] != "https://simkl.com") {
+        return SimklAuthCallback.Invalid
+    }
     val code = parsed.parameters["code"].orEmpty().trim()
     val state = parsed.parameters["state"].orEmpty().trim()
     if (code.isBlank() || state.isBlank()) return SimklAuthCallback.Invalid
@@ -47,7 +51,8 @@ internal fun buildSimklAuthorizationUrl(
     material: SimklPkceMaterial,
 ): String = buildString {
     append(SIMKL_AUTHORIZE_URL)
-    append("?response_type=code")
+    append("?response_type=code&scope=")
+    append(SIMKL_OAUTH2_SCOPE.encodeURLParameter())
     append("&client_id=")
     append(clientId.encodeURLParameter())
     append("&redirect_uri=")

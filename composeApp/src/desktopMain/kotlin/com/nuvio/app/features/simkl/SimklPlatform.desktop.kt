@@ -23,6 +23,8 @@ internal actual object SimklAuthStorage {
     private const val metadataKey = "simkl_auth_metadata"
     private const val accessTokenKey = "simkl_access_token"
     private const val codeVerifierKey = "simkl_code_verifier"
+    private const val refreshTokenKey = "simkl_refresh_token"
+    private const val deviceCodeKey = "simkl_device_code"
     private val store = DesktopStorage.store("nuvio_simkl_auth")
 
     actual fun loadMetadataPayload(): String? =
@@ -46,12 +48,26 @@ internal actual object SimklAuthStorage {
         store.putString(ProfileScopedKey.of(codeVerifierKey), value)
     }
 
+    actual fun loadRefreshToken(): String? = store.getString(ProfileScopedKey.of(refreshTokenKey))
+
+    actual fun saveRefreshToken(value: String?) {
+        store.putString(ProfileScopedKey.of(refreshTokenKey), value)
+    }
+
+    actual fun loadDeviceCode(): String? = store.getString(ProfileScopedKey.of(deviceCodeKey))
+
+    actual fun saveDeviceCode(value: String?) {
+        store.putString(ProfileScopedKey.of(deviceCodeKey), value)
+    }
+
     actual fun removeProfile(profileId: Int) {
         store.removeAll(
             listOf(
                 ProfileScopedKey.of(metadataKey, profileId),
                 ProfileScopedKey.of(accessTokenKey, profileId),
                 ProfileScopedKey.of(codeVerifierKey, profileId),
+                ProfileScopedKey.of(refreshTokenKey, profileId),
+                ProfileScopedKey.of(deviceCodeKey, profileId),
             ),
         )
     }

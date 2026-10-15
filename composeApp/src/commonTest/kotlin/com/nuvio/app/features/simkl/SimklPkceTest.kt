@@ -49,9 +49,10 @@ class SimklPkceTest {
             material = SimklPkceMaterial("verifier", "challenge", "state"),
         )
 
-        assertTrue(url.startsWith("https://simkl.com/oauth/authorize?"))
+        assertTrue(url.startsWith("https://simkl.com/oauth2/authorize?"))
         assertTrue("client_id=client+id" in url || "client_id=client%20id" in url)
         assertTrue("code_challenge_method=S256" in url)
+        assertEquals(SIMKL_OAUTH2_SCOPE, io.ktor.http.Url(url).parameters["scope"])
         assertTrue("redirect_uri=nuvio%3A%2F%2Fauth%2Fsimkl" in url)
     }
 

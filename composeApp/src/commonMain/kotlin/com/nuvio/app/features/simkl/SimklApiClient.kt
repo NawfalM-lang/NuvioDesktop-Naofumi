@@ -64,8 +64,9 @@ internal fun interface SimklHttpEngine {
 
 internal class SimklApiClient(
     private val engine: SimklHttpEngine,
-    private val accessToken: () -> String?,
-    private val onUnauthorized: () -> Unit,
+    private val accessToken: suspend () -> String?,
+    private val onUnauthorized: (String?) -> Unit,
+    private val refreshAccessToken: suspend (String?) -> String? = { null },
     private val nowEpochMs: () -> Long = SimklPlatformClock::nowEpochMs,
     private val sleep: suspend (Long) -> Unit = { delayMs -> delay(delayMs) },
     private val retryJitterMs: () -> Long = { Random.nextLong(RETRY_JITTER_BOUND_MS + 1L) },
@@ -76,7 +77,7 @@ internal class SimklApiClient(
     private var nextPostAtEpochMs = 0L
 
     suspend fun execute(request: SimklApiRequest): SimklApiResponse = requestMutex.withLock {
-        val token = if (request.requiresAuthentication) {
+        var token = if (request.requiresAuthentication) {
             accessToken()?.takeIf(String::isNotBlank)
                 ?: throw SimklApiException(
                     status = 401,
@@ -93,9 +94,10 @@ internal class SimklApiClient(
             -> MAX_ATTEMPTS
             SimklRetryPolicy.NEVER -> 1
         }
+        var authorizationRetried = false
         var syncWriteLockRetried = false
         for (attempt in 0 until maxAttempts) {
-            val response = try {
+            var response = try {
                 executeRateLimited(request.method) {
                     engine.execute(
                         method = request.method.name,
@@ -122,6 +124,30 @@ internal class SimklApiClient(
                 continue
             }
 
+            if (response.status == 401 && request.requiresAuthentication && !authorizationRetried) {
+                authorizationRetried = true
+                val renewed = refreshAccessToken(token)?.takeIf(String::isNotBlank)
+                if (renewed != null) {
+                    token = renewed
+                    // A definitive 401 did not apply the original request. Retry once, including
+                    // requests whose transport retry policy is NEVER; never loop on a second 401.
+                    response = try {
+                        executeRateLimited(request.method) {
+                            engine.execute(
+                                method = request.method.name,
+                                url = buildSimklApiUrl(request.path, request.query),
+                                headers = simklRequestHeaders(token, request.method == SimklHttpMethod.POST),
+                                body = request.body,
+                            )
+                        }
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (_: Throwable) {
+                        throw SimklApiException(null, "transport_failure", "Simkl request failed")
+                    }
+                }
+            }
+
             logSyncReadResponse(
                 request = request,
                 response = response,
@@ -146,7 +172,7 @@ internal class SimklApiClient(
                     return@withLock response.toApiResponse(isSoftSuccess = true)
                 }
                 SimklResponseAction.REAUTHENTICATE -> {
-                    if (request.requiresAuthentication) onUnauthorized()
+                    if (request.requiresAuthentication) onUnauthorized(token)
                     throw response.toApiException(json)
                 }
                 SimklResponseAction.FAIL -> throw response.toApiException(json)
@@ -231,6 +257,16 @@ internal fun simklSyncResponseLogMessage(
 }
 
 internal object SimklApi {
+    val oauth2: SimklOAuth2Client by lazy {
+        SimklOAuth2Client(
+            engine = SimklHttpEngine { method, url, headers, body ->
+                httpRequestRaw(method, url, headers, body, maxResponseBodyBytes = 64 * 1024)
+            },
+            clientId = SimklConfig.CLIENT_ID,
+            userAgent = "${SimklConfig.APP_NAME}/$simklAppVersion",
+        )
+    }
+
     val client: SimklApiClient by lazy {
         SimklApiClient(
             engine = SimklHttpEngine { method, url, headers, body ->
@@ -242,8 +278,9 @@ internal object SimklApi {
                     maxResponseBodyBytes = SIMKL_MAX_RESPONSE_BODY_BYTES,
                 )
             },
-            accessToken = SimklAuthRepository::authorizedAccessToken,
+            accessToken = SimklAuthRepository::validAccessToken,
             onUnauthorized = SimklAuthRepository::onUnauthorizedResponse,
+            refreshAccessToken = SimklAuthRepository::refreshRejectedAccessToken,
         )
     }
 }

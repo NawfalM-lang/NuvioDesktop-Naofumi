@@ -310,6 +310,71 @@ class SimklApiClientTest {
         assertFalse(harness.wasUnauthorized)
     }
 
+    @Test
+    fun `401 refresh retries once even for requests with no transport retries`(): Unit = runBlocking {
+        val engine = RecordingEngine(response(401), response(200))
+        var refreshCount = 0
+        var unauthorizedCount = 0
+        val client = SimklApiClient(
+            engine = engine,
+            accessToken = { "expired" },
+            onUnauthorized = { unauthorizedCount++ },
+            refreshAccessToken = { rejected ->
+                assertEquals("expired", rejected)
+                refreshCount++
+                "renewed"
+            },
+            sleep = {},
+        )
+        client.execute(SimklApiRequest(SimklHttpMethod.POST, "/scrobble/stop", retryPolicy = SimklRetryPolicy.NEVER))
+        assertEquals(listOf("Bearer expired", "Bearer renewed"), engine.requests.map { it.headers["Authorization"] })
+        assertEquals(1, refreshCount)
+        assertEquals(0, unauthorizedCount)
+    }
+
+    @Test
+    fun `second 401 invalidates only the rejected replacement token and never loops`(): Unit = runBlocking {
+        val engine = RecordingEngine(response(401), response(401), response(200))
+        var refreshCount = 0
+        val rejected = mutableListOf<String?>()
+        val client = SimklApiClient(
+            engine, accessToken = { "expired" }, onUnauthorized = { rejected += it },
+            refreshAccessToken = { refreshCount++; "renewed" }, sleep = {},
+        )
+        assertFailsWith<SimklApiException> { client.execute(SimklApiRequest(SimklHttpMethod.GET, "/private")) }
+        assertEquals(1, refreshCount)
+        assertEquals(listOf<String?>("renewed"), rejected)
+        assertEquals(2, engine.requests.size)
+    }
+
+    @Test
+    fun `temporary refresh failure does not discard the session or replay a write`(): Unit = runBlocking {
+        val engine = RecordingEngine(response(401), response(200))
+        var unauthorized = false
+        val client = SimklApiClient(
+            engine, accessToken = { "expired" }, onUnauthorized = { unauthorized = true },
+            refreshAccessToken = { throw SimklApiException(null, "token_refresh_failed", "Temporary failure") },
+            sleep = {},
+        )
+        assertFailsWith<SimklApiException> { client.execute(SimklApiRequest(SimklHttpMethod.POST, "/sync/history")) }
+        assertFalse(unauthorized)
+        assertEquals(1, engine.requests.size)
+    }
+
+    @Test
+    fun `unauthenticated requests never refresh tokens`(): Unit = runBlocking {
+        val engine = RecordingEngine(response(401))
+        var refreshCount = 0
+        val client = SimklApiClient(
+            engine, accessToken = { error("Must not read token") }, onUnauthorized = { error("Must not invalidate") },
+            refreshAccessToken = { refreshCount++; "renewed" }, sleep = {},
+        )
+        assertFailsWith<SimklApiException> {
+            client.execute(SimklApiRequest(SimklHttpMethod.GET, "/public", requiresAuthentication = false))
+        }
+        assertEquals(0, refreshCount)
+    }
+
     private class TestHarness(
         engine: RecordingEngine,
         responseDurationMs: Long = 0L,

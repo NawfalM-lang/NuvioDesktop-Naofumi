@@ -10,6 +10,9 @@ enum class SimklConnectionMode {
 
 enum class SimklAuthError {
     MISSING_CLIENT_ID,
+    INVALID_CLIENT,
+    INSUFFICIENT_SCOPE,
+    CONNECTION_FAILED,
     INVALID_CALLBACK,
     INVALID_CALLBACK_STATE,
     AUTHORIZATION_EXPIRED,
@@ -40,6 +43,8 @@ internal data class SimklStoredAuthState(
     val hasFetchedUserSettings: Boolean = false,
     val settingsActivityWatermark: String? = null,
     val tokenExpiresAtEpochMs: Long? = null,
+    val oauthClientId: String? = null,
+    val pendingPinUsesOAuth2: Boolean = false,
     val pendingAuthorizationState: String? = null,
     val pendingAuthorizationStartedAtEpochMs: Long? = null,
     val pendingPinUserCode: String? = null,
