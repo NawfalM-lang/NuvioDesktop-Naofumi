@@ -460,6 +460,12 @@ jobs:
           }
           "WEBVIEW2_ROOT=$webView2Root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Set up subtitle runtime build Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          architecture: x64
+
       - name: Build MSI
         shell: pwsh
         run: |
@@ -502,6 +508,19 @@ jobs:
           if ($extractProcess.ExitCode -ne 0) {
             Get-Content $extractLog -Tail 200
             throw "MSI administrative extraction failed with exit code $($extractProcess.ExitCode)."
+          }
+
+          $subtitleRuntime = Get-ChildItem $extractDir -Recurse -Filter "nuvio-subtitle-sync.exe" | Select-Object -First 1
+          if ($null -eq $subtitleRuntime) {
+            throw "The MSI is missing the private subtitle runtime."
+          }
+          $savedPath = $env:Path
+          try {
+            $env:Path = "$env:SystemRoot\System32"
+            & $subtitleRuntime.FullName --self-test
+            if ($LASTEXITCODE -ne 0) { throw "Packaged subtitle runtime self-test failed." }
+          } finally {
+            $env:Path = $savedPath
           }
 
           $appJar = Get-ChildItem $extractDir `

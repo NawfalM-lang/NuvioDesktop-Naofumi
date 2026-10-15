@@ -1,0 +1,26 @@
+# Windows subtitle runtime. Update together with the bundle self-test.
+ffsubsync==0.5.1
+auditok==0.1.5
+chardet==7.6.0
+charset-normalizer==3.5.2
+faust-cchardet==3.2.0
+ffmpeg-python==0.2.0
+future==1.0.0
+numpy==2.5.4
+pysubs2==1.9.0
+rich==15.0.0
+markdown-it-py==4.2.0
+mdurl==0.1.2
+Pygments==2.21.0
+srt==3.5.3
+tqdm==4.70.1
+typing-extensions==4.16.0
+webrtcvad-wheels==2.0.14.post1
+colorama==0.4.6; sys_platform == 'win32'
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8
+altgraph==0.17.5
+packaging==26.3
+setuptools==84.0.0
+pefile==2024.8.26; sys_platform == 'win32'
+pywin32-ctypes==0.2.3; sys_platform == 'win32'

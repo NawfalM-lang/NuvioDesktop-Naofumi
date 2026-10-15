@@ -11,7 +11,7 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.util.concurrent.TimeUnit
 
-/** Hybrid (embedded text first, audio VAD second) synchronization for Windows. */
+/** Fast English-reference subtitle synchronization for Windows. */
 internal object DesktopSubtitleHybridSync {
     // NUVIO_HYBRID_SYNC_V41_DIAG. NEVER log signed URLs or private headers.
     private fun logStage(label: String) {
@@ -63,14 +63,19 @@ internal object DesktopSubtitleHybridSync {
         work.toFile().deleteOnExit()
         output.toFile().deleteOnExit()
         try {
-            logStage("V4.1 launching Python")
+            val command = DesktopSubtitleSyncRuntime.command(workerFile, jobFile)
+            logStage(if (command.first() == "py") "Launching development Python" else "Launching bundled subtitle runtime")
             val process = try {
-                ProcessBuilder("py", "-3", workerFile.toString(), jobFile.toString())
+                ProcessBuilder(command)
                     .redirectErrorStream(true)
                     .redirectOutput(logFile.toFile())
                     .start()
             } catch (error: java.io.IOException) {
-                throw IllegalStateException("Python launcher not found. Install Python 3 and ffsubsync.", error)
+                throw IllegalStateException(
+                    if (command.first() == "py") "Development subtitle sync needs Python 3 and ffsubsync, or buildWindowsSubtitleSync."
+                    else "Bundled subtitle runtime could not start. Reinstall this Nuvio build.",
+                    error,
+                )
             }
             val finished = process.waitFor(55, TimeUnit.SECONDS)
             if (!finished) {

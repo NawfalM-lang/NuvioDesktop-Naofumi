@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 
@@ -57,6 +58,10 @@ def fetch_subtitle(url, workspace, stem):
 def binary_pair():
     """Find both FFmpeg programs only when video access or conversion needs them."""
     paths = []
+    # PyInstaller's one-directory bundle keeps FFmpeg beside its private runtime.
+    # Prefer it to anything installed on the user's PC.
+    if getattr(sys, 'frozen', False):
+        paths.append(pathlib.Path(sys._MEIPASS) / 'bin')
     override = os.environ.get('NUVIO_FFMPEG_BIN', '').strip().strip('"')
     if override:
         p = pathlib.Path(override)
@@ -179,7 +184,10 @@ def synchronize(reference, source, output, partial):
         import ffsubsync
         from ffsubsync.ffsubsync import make_parser
     except ImportError as exc:
-        raise RuntimeError('FFsubsync missing: py -3 -m pip install ffsubsync') from exc
+        message = ('Bundled subtitle runtime is incomplete; reinstall this Nuvio build'
+                   if getattr(sys, 'frozen', False)
+                   else 'FFsubsync missing: py -3 -m pip install ffsubsync')
+        raise RuntimeError(message) from exc
     args = [str(reference), '-i', str(source), '-o', str(output),
             '--skip-sync-on-low-quality', '--quality-max-offset-seconds', '25']
     if partial:
@@ -214,9 +222,59 @@ def main(job_file):
     return 0
 
 
+def self_test():
+    """Offline test run by the packager, including actual native libraries."""
+    import random
+    import srt
+    from datetime import timedelta
+    from importlib.metadata import version
+
+    ffmpeg, ffprobe = binary_pair()
+    for program in (ffmpeg, ffprobe):
+        subprocess.run([str(program), '-version'], check=True, timeout=10,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with tempfile.TemporaryDirectory(prefix='nuvio sync test ') as directory:
+        work = pathlib.Path(directory)
+        rng = random.Random(932)
+        cues = []
+        start = 10.0
+        for index in range(1, 101):
+            duration = rng.uniform(0.7, 3.0)
+            cues.append(srt.Subtitle(index, timedelta(seconds=start),
+                                    timedelta(seconds=start + duration), 'مرحبا بالعالم'))
+            start += duration + rng.uniform(0.8, 5.0)
+        reference = work / 'reference.srt'
+        source = work / 'arabic.srt'
+        output = work / 'synced.srt'
+        reference.write_text(srt.compose(cues), encoding='utf-8')
+        shifted = [srt.Subtitle(c.index, c.start + timedelta(seconds=2),
+                               c.end + timedelta(seconds=2), c.content) for c in cues]
+        source.write_text(srt.compose(shifted), encoding='utf-8')
+        synchronize(reference, source, output, partial=False)
+        corrected = list(srt.parse(output.read_text(encoding='utf-8-sig')))
+        if len(corrected) != len(cues) or any(c.content != 'مرحبا بالعالم' for c in corrected):
+            raise RuntimeError('Self-test lost Arabic subtitle text')
+        if abs((corrected[0].start - cues[0].start).total_seconds()) > 0.12:
+            raise RuntimeError('Self-test could not correct a two-second timing offset')
+        vtt = work / 'sample.vtt'
+        vtt.write_text('WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nمرحبا بالعالم\n', encoding='utf-8')
+        to_srt(vtt, work / 'converted.srt')
+        # Exercise the embedded-English fallback against local media, without a server.
+        video = work / 'reference.mkv'
+        subprocess.run([str(ffmpeg), '-v', 'error', '-nostdin', '-y',
+                        '-f', 'lavfi', '-i', 'color=size=16x16:rate=1',
+                        '-i', str(reference), '-map', '0:v', '-map', '1:s',
+                        '-c:v', 'ffv1', '-c:s', 'srt', '-metadata:s:s:0', 'language=eng',
+                        '-t', '30', str(video)], check=True, timeout=20,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        embedded_english_reference(str(video), work)
+    print('SELF_TEST_OK ffsubsync=' + version('ffsubsync'), flush=True)
+    return 0
+
+
 if __name__ == '__main__':
     try:
-        sys.exit(main(sys.argv[1]))
+        sys.exit(self_test() if sys.argv[1:] == ['--self-test'] else main(sys.argv[1]))
     except Exception as e:
         # Never print a signed URL, addon URL, or custom headers in diagnostics.
         error = str(e).split('http')[0].split('file:')[0][:200]

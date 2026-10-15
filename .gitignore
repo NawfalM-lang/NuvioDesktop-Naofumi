@@ -34,6 +34,12 @@ AGENTS.md
 PERFORMANCE_FINDINGS.md
 scripts/*
 !scripts/sign-ios-device-app.py
+!scripts/build_windows_subtitle_sync.py
+!scripts/subtitle-sync-requirements.txt
+!scripts/pyinstaller-hooks/
+!scripts/test_windows_subtitle_sync.py
+__pycache__/
+*.py[cod]
 iosApp/Configuration/DeviceSigning.local.json
 
 # Local MPVKit iOS build environment (sparse APFS image, see MPVKit docs)
