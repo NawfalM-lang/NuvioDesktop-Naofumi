@@ -3,6 +3,7 @@ package com.nuvio.app.features.player
 import com.nuvio.app.features.addons.AddonRepository
 import com.nuvio.app.features.addons.AddonResource
 import com.nuvio.app.features.addons.buildAddonResourceUrl
+import com.nuvio.app.features.addons.encodeAddonPathSegment
 import com.nuvio.app.features.addons.enabledAddons
 import com.nuvio.app.features.addons.fetchAddonResponseText
 import com.nuvio.app.features.servers.ServerItemRef
@@ -31,7 +32,20 @@ data class SubtitleAddonRequest(
     val addonName: String,
 )
 
-internal fun addonSubtitleRequests(type: String, videoId: String): List<SubtitleAddonRequest> {
+internal fun subtitleExtraPathSegment(filename: String?, videoSize: Long?): String? =
+    buildList {
+        filename?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            add("filename=${it.encodeAddonPathSegment()}")
+        }
+        videoSize?.takeIf { it > 0L }?.let { add("videoSize=$it") }
+    }.joinToString("&").ifEmpty { null }
+
+internal fun addonSubtitleRequests(
+    type: String,
+    videoId: String,
+    filename: String? = null,
+    videoSize: Long? = null,
+): List<SubtitleAddonRequest> {
     if (ServerItemRef.isServerId(videoId)) return emptyList()
     val requestType = canonicalSubtitleType(type)
     return AddonRepository.uiState.value.addons.enabledAddons().mapNotNull { addon ->
@@ -41,7 +55,13 @@ internal fun addonSubtitleRequests(type: String, videoId: String): List<Subtitle
                     resource.supportsSubtitleType(requestType, videoId)
             }) return@mapNotNull null
         SubtitleAddonRequest(
-            url = buildAddonResourceUrl(manifest.transportUrl, "subtitles", requestType, videoId),
+            url = buildAddonResourceUrl(
+                manifest.transportUrl,
+                "subtitles",
+                requestType,
+                videoId,
+                extraPathSegment = subtitleExtraPathSegment(filename, videoSize),
+            ),
             addonId = manifest.id,
             addonName = addon.displayTitle,
         )
@@ -76,15 +96,20 @@ private suspend fun parseAddonSubtitles(response: String, request: SubtitleAddon
         val url = obj.stringValue("url") ?: return@mapIndexedNotNull null
         val language = listOf("lang", "language", "languageCode", "locale", "label")
             .firstNotNullOfOrNull(obj::stringValue) ?: "unknown"
+        val defaultDisplay = getString(
+            Res.string.player_addon_subtitle_display_format,
+            getLanguageLabelForCode(language),
+            request.addonName,
+        )
+        // SubSense (and some other addons) return human-readable release names.
+        // Keep them visible so the user can distinguish a matching release.
+        val releaseLabel = listOf("label", "releaseName", "fileName")
+            .firstNotNullOfOrNull(obj::stringValue)
         AddonSubtitle(
             id = obj.stringValue("id") ?: "${request.addonId}_$index",
             url = url,
             language = normalizeLanguageCode(language) ?: language,
-            display = getString(
-                Res.string.player_addon_subtitle_display_format,
-                getLanguageLabelForCode(language),
-                request.addonName,
-            ),
+            display = releaseLabel?.let { "$defaultDisplay · ${it.take(512)}" } ?: defaultDisplay,
             addonName = request.addonName,
         )
     }

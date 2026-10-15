@@ -70,11 +70,15 @@ internal fun StreamCard(
     val cardShape = RoundedCornerShape(12.dp)
     val badgeImages = stream.badges.filter { it.imageURL.isNotBlank() }
     val hasBadges = badgeImages.isNotEmpty() || (showFileSizeBadges && stream.behaviorHints.videoSize != null)
+    // Badge-only applies only when there is a usable metadata or size badge.
+    // NUVIO_STREAM_BADGES_ONLY_V81: file-size badges count, too.
+    // NUVIO_STREAM_LIST_V9: larger cards for badge-only mode.
+    val badgeOnly = hasBadges
     var cardPositionInRoot by remember { mutableStateOf(Offset.Zero) }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 68.dp)
+            .heightIn(min = if (badgeOnly) 70.dp else 68.dp)
             .shadow(
                 elevation = 2.dp,
                 shape = cardShape,
@@ -121,53 +125,66 @@ internal fun StreamCard(
                     null
                 },
             )
-            .padding(14.dp),
+            .padding(if (badgeOnly) 16.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
+            // NUVIO_STREAM_BADGES_ONLY_V8: keep complete metadata, display badges only when available.
+            if (badgeOnly) {
                 StreamCardBadgeRow(
                     badgeImages = badgeImages,
                     stream = stream,
                     showFileSizeBadges = showFileSizeBadges,
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-            }
-
-            StreamNameWithInstantService(
-                stream = stream,
-                appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
-            ) {
                 if (isCurrent && !currentLabel.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(5.dp))
                     CurrentStreamBadge(label = currentLabel)
                 }
-            }
+            } else {
+                if (hasBadges && badgePlacement == StreamBadgePlacement.TOP) {
+                    StreamCardBadgeRow(
+                        badgeImages = badgeImages,
+                        stream = stream,
+                        showFileSizeBadges = showFileSizeBadges,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
 
-            val subtitle = stream.streamSubtitle
-            if (!subtitle.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
-                Spacer(modifier = Modifier.height(5.dp))
-                StreamCardBadgeRow(
-                    badgeImages = badgeImages,
+                StreamNameWithInstantService(
                     stream = stream,
-                    showFileSizeBadges = showFileSizeBadges,
-                )
+                    appendInstantServiceToDefaultName = appendInstantServiceToDefaultName,
+                ) {
+                    if (isCurrent && !currentLabel.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        CurrentStreamBadge(label = currentLabel)
+                    }
+                }
+
+                val subtitle = stream.streamSubtitle
+                if (!subtitle.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                if (hasBadges && badgePlacement == StreamBadgePlacement.BOTTOM) {
+                    Spacer(modifier = Modifier.height(5.dp))
+                    StreamCardBadgeRow(
+                        badgeImages = badgeImages,
+                        stream = stream,
+                        showFileSizeBadges = showFileSizeBadges,
+                    )
+                }
             }
         }
 
-        if (showAddonLogo) {
+        if (showAddonLogo && !badgeOnly) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,

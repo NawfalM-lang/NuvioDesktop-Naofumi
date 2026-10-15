@@ -154,6 +154,8 @@ internal class PlayerScreenRuntime(
         } ?: sourceUrl.trim().takeIf { it.isNotBlank() }?.let { url -> "url:$url" },
     )
     var activeStreamTitle by mutableStateOf(streamTitle)
+    var activeStreamFilename by mutableStateOf(args.streamFilename ?: args.torrentFilename)
+    var activeStreamVideoSize by mutableStateOf(args.streamVideoSize)
     var activeStreamSubtitle by mutableStateOf(streamSubtitle)
     var activeProviderName by mutableStateOf(providerName)
     var activeProviderAddonId by mutableStateOf(providerAddonId)
@@ -269,6 +271,8 @@ internal class PlayerScreenRuntime(
     var autoFetchedAddonSubtitlesForKey by mutableStateOf<String?>(null)
     var trackPreferenceRestoreApplied by mutableStateOf(false)
     var subtitleDelayMs by mutableStateOf(0)
+    // NUVIO_HYBRID_SYNC_V4
+    var hybridSyncRunning by mutableStateOf(false)
     var subtitleAutoSyncState by mutableStateOf(SubtitleAutoSyncUiState())
 
     var lastSyncedSettingsResizeMode: PlayerResizeMode? = null

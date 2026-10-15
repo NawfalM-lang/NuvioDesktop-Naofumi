@@ -291,6 +291,62 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         }
     }
 
+    // NUVIO_SUBTITLE_AUTO_RELEASE_V3
+    // The first subtitle provider may finish before a better release match arrives.
+    // Recheck only once the whole subtitle fetch has finished; never override
+    // a manual selection or one restored from saved subtitle preferences.
+    LaunchedEffect(
+        playerController,
+        playbackSnapshot.isLoading,
+        activeSourceUrl,
+        activeStreamFilename,
+        isLoadingAddonSubtitles,
+        addonSubtitles,
+    ) {
+        val controller = playerController ?: return@LaunchedEffect
+        if (playbackSnapshot.isLoading || isLoadingAddonSubtitles || addonSubtitles.isEmpty()) {
+            return@LaunchedEffect
+        }
+        if (playerControllerSourceUrl != activeSourceUrl || isUserExplicitSubtitleSelection) {
+            return@LaunchedEffect
+        }
+        // Don't act on results from the previous stream while a new request is pending.
+        if (addonSubtitleFetchKey == null || autoFetchedAddonSubtitlesForKey != addonSubtitleFetchKey) {
+            return@LaunchedEffect
+        }
+        val targetLanguage = normalizeLanguageCode(playerSettingsUiState.preferredSubtitleLanguage)
+            ?: return@LaunchedEffect
+        if (targetLanguage == SubtitleLanguageOption.NONE ||
+            targetLanguage == SubtitleLanguageOption.FORCED
+        ) return@LaunchedEffect
+
+        val filename = activeStreamFilename ?: activeTorrentFilename
+        val best = addonSubtitles
+            .filter { subtitle ->
+                SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, targetLanguage) &&
+                    !addonSubtitleIsForced(subtitle)
+            }
+            .rankedForRelease(filename)
+            .firstOrNull() ?: return@LaunchedEffect
+
+        // Weak or missing release information must not displace the normal
+        // subtitle preference or trigger a random provider switch.
+        if (!best.isConfidentReleaseMatch(filename)) return@LaunchedEffect
+        if (selectedAddonSubtitle?.url == best.url) return@LaunchedEffect
+        if (selectedAddonSubtitle?.let { selected ->
+                selected.releaseMatchScore(filename) >= best.releaseMatchScore(filename)
+            } == true) return@LaunchedEffect
+
+        selectedAddonSubtitleId = best.selectionKey
+        selectedSubtitleIndex = -1
+        useCustomSubtitles = true
+        preferredSubtitleSelectionApplied = true
+        if (!maybeAutoSyncPreferredSubtitleAtStart(best)) {
+            controller.setSubtitleUri(best.url)
+        }
+        println("NUVIO_SUBTITLE_AUTO_V3 selected=${best.addonName.orEmpty()} score=${best.releaseMatchScore(filename)}")
+    }
+
     LaunchedEffect(
         playerController,
         playbackSnapshot.isLoading,

@@ -22,6 +22,14 @@ interface PlayerEngineController {
     fun selectAudioTrack(index: Int)
     fun selectSubtitleTrack(index: Int)
     fun setSubtitleUri(url: String)
+    // NUVIO_HYBRID_SYNC_V4: Windows-only ffsubsync integration; null on other engines.
+    // NUVIO_FAST_SUBSYNC_V5: optional English subtitle URL; no media access needed.
+    suspend fun createAutoSyncedSubtitle(
+        videoUrl: String,
+        subtitleUrl: String,
+        videoHeaders: Map<String, String>,
+        referenceSubtitleUrl: String? = null,
+    ): String? = null
     fun clearExternalSubtitle()
     fun clearExternalSubtitleAndSelect(trackIndex: Int)
     fun applySubtitleStyle(style: SubtitleStyleState, useLibass: Boolean = false) {}

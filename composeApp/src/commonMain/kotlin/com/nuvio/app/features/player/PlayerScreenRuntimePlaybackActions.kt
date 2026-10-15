@@ -106,6 +106,8 @@ internal fun PlayerScreenRuntime.currentLaunch(launch: PlayerLaunch): PlayerLaun
         episodeTitle = activeEpisodeTitle,
         episodeThumbnail = activeEpisodeThumbnail,
         streamTitle = activeStreamTitle,
+        streamFilename = activeStreamFilename,
+        streamVideoSize = activeStreamVideoSize,
         streamSubtitle = activeStreamSubtitle,
         bingeGroup = currentStreamBingeGroup,
         pauseDescription = activePauseDescription,

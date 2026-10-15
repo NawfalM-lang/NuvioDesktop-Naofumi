@@ -187,7 +187,12 @@ object DownloadsRepository {
             sourceUrl = sourceUrl,
             sourceHeaders = sanitizeRequestHeaders(stream.behaviorHints.proxyHeaders?.request),
             sourceResponseHeaders = sanitizeResponseHeaders(stream.behaviorHints.proxyHeaders?.response),
-            subtitleRequests = addonSubtitleRequests(contentType, videoId),
+            subtitleRequests = addonSubtitleRequests(
+                contentType,
+                videoId,
+                filename = stream.behaviorHints.filename,
+                videoSize = stream.behaviorHints.videoSize,
+            ),
             sourceSubtitles = stream.externalSubtitles,
             localFileUri = null,
             fileName = fileName,

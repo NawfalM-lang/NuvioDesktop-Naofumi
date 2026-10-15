@@ -1031,6 +1031,15 @@ internal class NativePlayerController(
         applyPendingSubtitleSettings()
     }
 
+    // NUVIO_HYBRID_SYNC_V4
+    // NUVIO_FAST_SUBSYNC_V5
+    override suspend fun createAutoSyncedSubtitle(
+        videoUrl: String,
+        subtitleUrl: String,
+        videoHeaders: Map<String, String>,
+        referenceSubtitleUrl: String?,
+    ): String? = DesktopSubtitleHybridSync.create(videoUrl, subtitleUrl, videoHeaders, referenceSubtitleUrl)
+
     override fun setSubtitleUri(url: String) {
         log.d { "setSubtitleUri ${url.toPlaybackLogKey()} handle=$handle" }
         handle.takeIf { it != 0L }?.let { current ->

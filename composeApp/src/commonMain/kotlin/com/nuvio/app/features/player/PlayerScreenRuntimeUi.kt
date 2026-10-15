@@ -19,6 +19,7 @@ import com.nuvio.app.core.format.formatReleaseDateForDisplay
 import com.nuvio.app.core.i18n.localizedByteUnit
 import com.nuvio.app.core.ui.AppPresenceState
 import com.nuvio.app.core.ui.PresenceSnapshot
+import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.themePalette
 import com.nuvio.app.features.debrid.DebridSettingsRepository
@@ -32,6 +33,7 @@ import com.nuvio.app.features.p2p.formatP2pSpeed
 import com.nuvio.app.features.player.skip.SkipIntroRepository
 import com.nuvio.app.features.streams.AddonStreamGroup
 import com.nuvio.app.features.streams.StreamBadgeSettingsRepository
+import com.nuvio.app.features.streams.sortedForArabicSubtitlePreference
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.isSelectableForPlayback
 import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
@@ -1051,6 +1053,91 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
         "subtitleDelayReset" -> setSubtitleDelay(0)
         "subtitleAutoSyncCapture" -> captureSubtitleAutoSyncTime()
         "subtitleAutoSyncReload" -> loadSubtitleAutoSyncCues(force = true)
+        // NUVIO_HYBRID_SYNC_V4: optional on-demand embedded-subtitle/audio sync.
+        "subtitleHybridAutoSync" -> {
+            // NUVIO_HYBRID_SYNC_V41_DIAG: acknowledge every click in-player.
+            println("NUVIO_HYBRID_SYNC_V41: click received desktop=$isDesktop running=$hybridSyncRunning")
+            if (!isDesktop) {
+                subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Sync to video requires Nuvio Desktop on Windows")
+            } else if (hybridSyncRunning) {
+                subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Synchronization is already running; please wait")
+            } else {
+                val selected = selectedAddonSubtitle
+                val controller = playerController
+                val videoUrl = activeSourceUrl
+                val videoId = activeVideoId
+                when {
+                    selected == null || controller == null -> {
+                        println("NUVIO_HYBRID_SYNC_V41: aborted - no addon subtitle or controller")
+                        subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Select an add-on subtitle before syncing")
+                    }
+                    !(videoUrl.startsWith("https://") || videoUrl.startsWith("http://") ||
+                        videoUrl.startsWith("file:")) -> scope.launch {
+                        subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Unsupported stream URL for synchronization")
+                        NuvioToastController.show("This video source cannot be analyzed by ffsubsync")
+                    }
+                    else -> {
+                        hybridSyncRunning = true
+                        subtitleAutoSyncState = subtitleAutoSyncState.copy(
+                            errorMessage = "Analyzing video… this may take 1–3 minutes",
+                            isLoading = false,
+                        )
+                        println("NUVIO_HYBRID_SYNC_V41: running worker")
+                        // NUVIO_FAST_SUBSYNC_V5: reference is an English addon subtitle
+                        // for this episode, ordered by existing V2 release matching.
+                        val englishReferenceUrl = addonSubtitles.filter { candidate ->
+                            SubtitleLanguageMatching.matchesLanguageCode(candidate.language, "en") &&
+                                !addonSubtitleIsForced(candidate) &&
+                                candidate.url != selected.url &&
+                                (candidate.url.startsWith("https://") || candidate.url.startsWith("http://"))
+                        }.rankedForRelease(activeStreamFilename ?: activeTorrentFilename)
+                            .firstOrNull()?.url
+                        subtitleAutoSyncState = subtitleAutoSyncState.copy(
+                            errorMessage = if (englishReferenceUrl != null) {
+                                "Aligning subtitles using an English add-on reference…"
+                            } else {
+                                "Looking for embedded English subtitles (up to 30s)…"
+                            },
+                            isLoading = false,
+                        )
+                        val subtitleUrl = selected.url
+                        val selectedKey = selected.selectionKey
+                        val headers = sanitizePlaybackHeaders(activeSourceHeaders)
+                        scope.launch {
+                            try {
+                                NuvioToastController.show("Fast subtitle-to-subtitle synchronization started")
+                                val syncedUri = controller.createAutoSyncedSubtitle(
+                                    videoUrl, subtitleUrl, headers, englishReferenceUrl,
+                                )
+                                    ?: error("Windows synchronizer not available")
+                                if (playerController === controller && activeSourceUrl == videoUrl &&
+                                    activeVideoId == videoId && selectedAddonSubtitle?.selectionKey == selectedKey
+                                ) {
+                                    controller.setSubtitleUri(syncedUri)
+                                    // Corrected timestamps already include offset/drift; avoid
+                                    // persisting a new manual delay for the original subtitle.
+                                    subtitleDelayMs = 0
+                                    controller.setSubtitleDelayMs(0)
+                                    println("NUVIO_HYBRID_SYNC_V41: completed successfully")
+                                    subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Synchronized subtitle loaded successfully")
+                                    NuvioToastController.show("Synchronized subtitle loaded")
+                                }
+                            } catch (error: kotlinx.coroutines.CancellationException) {
+                                throw error
+                            } catch (error: Exception) {
+                                // The worker deliberately redacts signed stream URLs in errors.
+                                val detail = (error.message ?: "Unknown error").substringBefore("http").take(180)
+                                println("NUVIO_HYBRID_SYNC_V41: failed: $detail")
+                                subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Sync failed: $detail")
+                                NuvioToastController.show("Subtitle sync: $detail")
+                            } finally {
+                                hybridSyncRunning = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
         "subtitleAutoSyncCue" -> {
             val cue = playerControlsNearestSubtitleCues().getOrNull(value.toInt()) ?: return true
             applySubtitleAutoSyncCue(cue)
@@ -1356,9 +1443,13 @@ private fun PlayerScreenRuntime.buildPlayerControlSourceItems(): List<PlayerCont
     val showFileSizeBadges = streamBadgeState.showFileSizeBadges
     val showAddonLogo = streamBadgeState.showAddonLogo
     val badgePlacement = streamBadgeState.badgePlacement.name
-    return sourceStreamsState.groups.flatMap { group ->
+    // NUVIO_STREAM_LIST_V9: preserve the original playback index while changing only display order.
+    val indexed = sourceStreamsState.groups.flatMap { group ->
         group.streams.map { stream -> group.addonId to stream }
-    }.mapIndexed { index, (filterId, stream) ->
+    }.mapIndexed { index, pair -> index to pair }
+        .sortedForArabicSubtitlePreference { it.second.second }
+    return indexed.map { (index, pair) ->
+        val (filterId, stream) = pair
         PlayerControlSourceItem(
             index = index,
             filterId = filterId,
@@ -1391,9 +1482,13 @@ private fun PlayerScreenRuntime.buildPlayerControlEpisodeStreamItems(): List<Pla
     val showFileSizeBadges = streamBadgeState.showFileSizeBadges
     val showAddonLogo = streamBadgeState.showAddonLogo
     val badgePlacement = streamBadgeState.badgePlacement.name
-    return episodeStreamsRepoState.groups.flatMap { group ->
+    // NUVIO_STREAM_LIST_V9: preserve the original playback index while changing only display order.
+    val indexed = episodeStreamsRepoState.groups.flatMap { group ->
         group.streams.map { stream -> group.addonId to stream }
-    }.mapIndexed { index, (filterId, stream) ->
+    }.mapIndexed { index, pair -> index to pair }
+        .sortedForArabicSubtitlePreference { it.second.second }
+    return indexed.map { (index, pair) ->
+        val (filterId, stream) = pair
         PlayerControlSourceItem(
             index = index,
             filterId = filterId,

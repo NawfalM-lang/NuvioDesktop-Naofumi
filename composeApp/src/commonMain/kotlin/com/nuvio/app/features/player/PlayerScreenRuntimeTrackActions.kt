@@ -14,12 +14,12 @@ internal val PlayerScreenRuntime.addonSubtitleFetchKey: String?
         addons = addonsUiState.addons,
         type = activeAddonSubtitleType,
         videoId = activeVideoId,
-    )
+    )?.let { "$it|${activeStreamFilename.orEmpty()}|${activeStreamVideoSize ?: 0L}" }
 
 internal val PlayerScreenRuntime.visibleAddonSubtitles: List<AddonSubtitle>
     get() {
         val filtered = filterAddonSubtitlesForSettings(
-            subtitles = addonSubtitles,
+            subtitles = addonSubtitles.rankedForRelease(activeStreamFilename ?: activeTorrentFilename),
             settings = playerSettingsUiState,
         )
         val selectedId = selectedAddonSubtitleId ?: return filtered
@@ -287,7 +287,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
             return
         }
         if (matchedTargetPosition > 0 && !isLoadingAddonSubtitles) {
-            val primaryAddonMatch = addonSubtitles.firstOrNull { subtitle ->
+            val primaryAddonMatch = addonSubtitles.rankedForRelease(activeStreamFilename ?: activeTorrentFilename).firstOrNull { subtitle ->
                 SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, selectionPlan.targets.first())
             }
             if (primaryAddonMatch != null) {
@@ -326,7 +326,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
             return
         }
         val forcedAddonMatch = if (selectedAudioTrack != null) {
-            addonSubtitles.firstOrNull { subtitle ->
+            addonSubtitles.rankedForRelease(activeStreamFilename ?: activeTorrentFilename).firstOrNull { subtitle ->
                 addonSubtitleIsForced(subtitle) &&
                     addonSubtitleMatchesLanguage(subtitle, requiredForcedTarget) &&
                     addonSubtitleMatchesSelectedAudioLanguage(subtitle, selectedAudioTrack)
@@ -368,7 +368,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
     if (playbackSnapshot.isLoading) return
 
     val addonMatch = selectionPlan.targets.firstNotNullOfOrNull { target ->
-        addonSubtitles.firstOrNull { subtitle ->
+        addonSubtitles.rankedForRelease(activeStreamFilename ?: activeTorrentFilename).firstOrNull { subtitle ->
             (!subtitleStyle.useForcedSubtitles || !addonSubtitleIsForced(subtitle)) &&
                 SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, target)
         }

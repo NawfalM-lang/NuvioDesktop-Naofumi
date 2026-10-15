@@ -30,7 +30,12 @@ object SubtitleRepository {
 
     private var activeFetchJob: Job? = null
 
-    fun fetchAddonSubtitles(type: String, videoId: String) {
+    fun fetchAddonSubtitles(
+        type: String,
+        videoId: String,
+        filename: String? = null,
+        videoSize: Long? = null,
+    ) {
         activeFetchJob?.cancel()
         _loadingProgress.value = null
         activeFetchJob = scope.launch {
@@ -38,7 +43,8 @@ object SubtitleRepository {
             _error.value = null
             _addonSubtitles.value = emptyList()
 
-            val requests = addonSubtitleRequests(type, videoId)
+            val requests = addonSubtitleRequests(type, videoId, filename, videoSize)
+            println("NUVIO_SUBTITLE_DIAG inputFilename=${filename ?: "<missing>"} videoSize=$videoSize addonRequests=${requests.size} withFilename=${requests.count { "filename=" in it.url }} withVideoSize=${requests.count { "videoSize=" in it.url }}")
             if (requests.isEmpty()) {
                 _isLoading.value = false
                 return@launch

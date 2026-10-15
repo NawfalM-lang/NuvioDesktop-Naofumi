@@ -79,6 +79,8 @@ internal fun PlayerDestination(
         episodeTitle = launch.episodeTitle,
         episodeThumbnail = launch.episodeThumbnail,
         streamTitle = launch.streamTitle,
+        streamFilename = launch.streamFilename,
+        streamVideoSize = launch.streamVideoSize,
         streamSubtitle = launch.streamSubtitle,
         initialBingeGroup = launch.bingeGroup,
         pauseDescription = launch.pauseDescription,

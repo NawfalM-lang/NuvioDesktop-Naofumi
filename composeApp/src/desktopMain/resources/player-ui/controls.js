@@ -99,6 +99,8 @@ const subtitleDelayReset = document.getElementById("subtitleDelayReset");
 const autoSyncLabel = document.getElementById("autoSyncLabel");
 const autoSyncReload = document.getElementById("autoSyncReload");
 const autoSyncCapture = document.getElementById("autoSyncCapture");
+// NUVIO_HYBRID_SYNC_V4
+const hybridSyncButton = document.getElementById("hybridSyncButton");
 const autoSyncStatus = document.getElementById("autoSyncStatus");
 const autoSyncCueList = document.getElementById("autoSyncCueList");
 const fontSizeLabel = document.getElementById("fontSizeLabel");
@@ -1685,6 +1687,13 @@ function formatCssColor(colorStr) {
     }
   }
 
+  // NUVIO_STREAM_BADGES_ONLY_V81: badge-only UI for both Sources and Episode streams.
+  // Keep names/descriptions on the underlying model and expose them as a tooltip.
+  if (badgeRow) {
+    row.classList.add("nuvio-badges-only-v81");
+    row.title = [item.label, item.subtitle].filter(Boolean).join("\n");
+  }
+
   if (isTopPlacement) {
     if (badgeRow) copy.appendChild(badgeRow);
     copy.appendChild(top);
@@ -2889,6 +2898,12 @@ autoSyncReload.addEventListener("click", event => {
 autoSyncCapture.addEventListener("click", event => {
   event.stopPropagation();
   send("subtitleAutoSyncCapture", 0);
+});
+hybridSyncButton.addEventListener("click", event => {
+  event.stopPropagation();
+  // NUVIO_HYBRID_SYNC_V41_DIAG: immediate feedback, even if native bridge is broken.
+  autoSyncStatus.textContent = "Sync clicked — waiting for Nuvio…";
+  send("subtitleHybridAutoSync", 0);
 });
 customSubtitleStyleToggle.addEventListener("click", event => {
   event.stopPropagation();

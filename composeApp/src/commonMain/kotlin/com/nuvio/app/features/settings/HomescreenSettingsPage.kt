@@ -3,6 +3,7 @@ package com.nuvio.app.features.settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -318,53 +319,155 @@ private fun HomescreenCatalogList(
     items: List<HomeCatalogSettingsItem>,
     onPinnedDragAttempt: () -> Unit,
 ) {
+    // NUVIO_CATALOG_BULK_REORDER_V7
     var expandedKey by remember { mutableStateOf<String?>(null) }
+    var multiSelect by remember { mutableStateOf(false) }
+    var selectedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val incomingKeys = items.map { it.key }
+    val localKeys = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { addAll(incomingKeys) } }
+    androidx.compose.runtime.LaunchedEffect(incomingKeys) {
+        // Updates from profile changes, Reset and remote sync. This does NOT fire on every
+        // drag hover, so the draggable row stays stable throughout a gesture.
+        if (localKeys != incomingKeys) {
+            localKeys.clear()
+            localKeys.addAll(incomingKeys)
+        }
+        selectedKeys = selectedKeys.intersect(incomingKeys.toSet())
+    }
+    val byKey = items.associateBy { it.key }
+    val pinnedKeys = items.filter { it.isPinnedToTop }.mapTo(mutableSetOf()) { it.key }
+    val orderedItems = localKeys.mapNotNull(byKey::get)
+    val movableKeys = incomingKeys.filterNot(pinnedKeys::contains)
+    // The reorderable state may retain its first callback; read live selection through
+    // Compose state to ensure multi-select changes affect dragging immediately.
+    val latestDragSelection = androidx.compose.runtime.rememberUpdatedState(
+        if (multiSelect) selectedKeys else emptySet<String>()
+    )
+    val latestPinnedKeys = androidx.compose.runtime.rememberUpdatedState(pinnedKeys)
     val hapticFeedback = LocalHapticFeedback.current
     val lazyListState = rememberLazyListState()
+
+    fun commitOrderIfChanged(nextKeys: List<String>) {
+        if (nextKeys != localKeys) {
+            localKeys.clear()
+            localKeys.addAll(nextKeys)
+        }
+        HomeCatalogSettingsRepository.applyOrder(nextKeys)
+    }
+
     val reorderableLazyListState = rememberReorderableLazyListState(
         lazyListState = lazyListState,
     ) { from, to ->
-        val fromItem = items.getOrNull(from.index)
-        val toItem = items.getOrNull(to.index)
-        if (fromItem?.isPinnedToTop == true || toItem?.isPinnedToTop == true) {
-            return@rememberReorderableLazyListState
+        val next = reorderHomeCatalogKeys(
+            keys = localKeys.toList(),
+            fromIndex = from.index,
+            toIndex = to.index,
+            selectedKeys = latestDragSelection.value,
+            pinnedKeys = latestPinnedKeys.value,
+        )
+        if (next != localKeys) {
+            localKeys.clear()
+            localKeys.addAll(next)
+            hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
-        HomeCatalogSettingsRepository.moveByIndex(from.index, to.index)
-        hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
     }
 
     SettingsGroup(isTablet = isTablet) {
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = if (isTablet) 900.dp else 680.dp),
-            state = lazyListState,
-        ) {
-            itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
-                ReorderableItem(
-                    reorderableLazyListState,
-                    key = item.key,
-                    enabled = !item.isPinnedToTop,
-                ) { isDragging ->
-                    val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
-
-                    Surface(shadowElevation = elevation) {
-                        Column {
-                            if (index > 0) {
-                                SettingsGroupDivider(isTablet = isTablet)
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                androidx.compose.material3.TextButton(onClick = {
+                    multiSelect = !multiSelect
+                    selectedKeys = emptySet()
+                }) {
+                    Text(if (multiSelect) "Done selecting" else "Select multiple")
+                }
+                if (multiSelect) {
+                    Text(
+                        "${selectedKeys.size} selected · drag a selected row to move the group",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (multiSelect) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    androidx.compose.material3.TextButton(onClick = {
+                        selectedKeys = movableKeys.toSet()
+                    }) { Text("Select all") }
+                    androidx.compose.material3.TextButton(onClick = {
+                        selectedKeys = emptySet()
+                    }, enabled = selectedKeys.isNotEmpty()) { Text("Clear") }
+                    androidx.compose.material3.TextButton(onClick = {
+                        commitOrderIfChanged(shiftSelectedHomeCatalogKeys(localKeys, selectedKeys, -1, pinnedKeys))
+                    }, enabled = selectedKeys.isNotEmpty()) { Text("↑ Up") }
+                    androidx.compose.material3.TextButton(onClick = {
+                        commitOrderIfChanged(shiftSelectedHomeCatalogKeys(localKeys, selectedKeys, 1, pinnedKeys))
+                    }, enabled = selectedKeys.isNotEmpty()) { Text("↓ Down") }
+                    androidx.compose.material3.TextButton(onClick = {
+                        commitOrderIfChanged(moveSelectedHomeCatalogKeysToEdge(localKeys, selectedKeys, true, pinnedKeys))
+                    }, enabled = selectedKeys.isNotEmpty()) { Text("To top") }
+                    androidx.compose.material3.TextButton(onClick = {
+                        commitOrderIfChanged(moveSelectedHomeCatalogKeysToEdge(localKeys, selectedKeys, false, pinnedKeys))
+                    }, enabled = selectedKeys.isNotEmpty()) { Text("To bottom") }
+                }
+            }
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = if (isTablet) 900.dp else 680.dp),
+                state = lazyListState,
+            ) {
+                itemsIndexed(orderedItems, key = { _, item -> item.key }) { index, item ->
+                    ReorderableItem(
+                        reorderableLazyListState,
+                        key = item.key,
+                        enabled = !item.isPinnedToTop,
+                    ) { isDragging ->
+                        val elevation by animateDpAsState(if (isDragging) 4.dp else 0.dp)
+                        Surface(shadowElevation = elevation) {
+                            Column {
+                                if (index > 0) SettingsGroupDivider(isTablet = isTablet)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (multiSelect) {
+                                        androidx.compose.material3.Checkbox(
+                                            checked = item.key in selectedKeys,
+                                            enabled = !item.isPinnedToTop,
+                                            onCheckedChange = { checked ->
+                                                selectedKeys = if (checked) selectedKeys + item.key
+                                                else selectedKeys - item.key
+                                            },
+                                        )
+                                    }
+                                    Box(modifier = Modifier.weight(1f)) {
+                                        HomescreenCatalogRow(
+                                            item = item,
+                                            isTablet = isTablet,
+                                            expanded = expandedKey == item.key,
+                                            onExpandedChange = { shouldExpand ->
+                                                expandedKey = if (shouldExpand) item.key else null
+                                            },
+                                            onTitleChange = { HomeCatalogSettingsRepository.setCustomTitle(item.key, it) },
+                                            onEnabledChange = { HomeCatalogSettingsRepository.setEnabled(item.key, it) },
+                                            dragHandleScope = this@ReorderableItem,
+                                            onPinnedDragAttempt = onPinnedDragAttempt,
+                                            onDragStopped = {
+                                                // One write and one Home refresh per gesture, not per hover.
+                                                HomeCatalogSettingsRepository.applyOrder(localKeys.toList())
+                                            },
+                                        )
+                                    }
+                                }
                             }
-                            HomescreenCatalogRow(
-                                item = item,
-                                isTablet = isTablet,
-                                expanded = expandedKey == item.key,
-                                onExpandedChange = { shouldExpand ->
-                                    expandedKey = if (shouldExpand) item.key else null
-                                },
-                                onTitleChange = { HomeCatalogSettingsRepository.setCustomTitle(item.key, it) },
-                                onEnabledChange = { HomeCatalogSettingsRepository.setEnabled(item.key, it) },
-                                dragHandleScope = this@ReorderableItem,
-                                onPinnedDragAttempt = onPinnedDragAttempt,
-                            )
                         }
                     }
                 }

@@ -920,6 +920,7 @@ private fun buildStreamSectionRenderModels(groups: List<AddonStreamGroup>): List
                         sourceName = sourceName,
                         streams = streamsBySource[sourceName]
                             .orEmpty()
+                            .sortedForArabicSubtitlePreference { it } // NUVIO_STREAM_LIST_V9
                             .withDuplicateSafeLazyKeys { stream ->
                                 streamCardRenderKey(
                                     sectionKey = sectionKey,
@@ -1017,7 +1018,7 @@ private fun LazyListScope.streamSection(
                     }
                 },
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
     }
 }

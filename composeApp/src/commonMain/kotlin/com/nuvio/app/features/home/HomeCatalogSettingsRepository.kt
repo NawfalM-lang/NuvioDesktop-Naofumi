@@ -293,6 +293,29 @@ object HomeCatalogSettingsRepository {
         move(key = key, direction = 1)
     }
 
+    // NUVIO_CATALOG_BULK_REORDER_V7
+    /** Persist an entire drag or bulk move in one transaction, after the gesture completes. */
+    fun applyOrder(orderedKeys: List<String>) {
+        ensureLoaded()
+        val currentKeys = allOrderedKeys()
+        if (orderedKeys == currentKeys) return
+        if (orderedKeys.size != currentKeys.size || orderedKeys.toSet() != currentKeys.toSet()) return
+        val pinnedKeys = collectionDefinitions.filter { it.isPinnedToTop }.mapTo(mutableSetOf()) { it.key }
+        val originalPinnedOrder = currentKeys.filter { it in pinnedKeys }
+        if (orderedKeys.take(originalPinnedOrder.size) != originalPinnedOrder) return
+
+        val updatedPreferences = preferences.toMutableMap()
+        orderedKeys.forEachIndexed { index, itemKey ->
+            val current = updatedPreferences[itemKey] ?: return@forEachIndexed
+            updatedPreferences[itemKey] = current.copy(order = index)
+        }
+        preferences = updatedPreferences
+        publish()
+        persist()
+        HomeRepository.applyCurrentSettings()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
     fun moveByIndex(fromIndex: Int, toIndex: Int) {
         ensureLoaded()
         val allKeys = allOrderedKeys()

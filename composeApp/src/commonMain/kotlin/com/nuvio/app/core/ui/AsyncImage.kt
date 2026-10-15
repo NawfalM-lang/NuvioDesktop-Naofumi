@@ -32,5 +32,5 @@ internal expect fun NuvioAsyncImage(
     colorFilter: ColorFilter? = null,
     filterQuality: FilterQuality? = null,
     clipToBounds: Boolean = true,
-    desktopImageScaling: NuvioDesktopImageScaling = NuvioDesktopImageScaling.Auto,
+    desktopImageScaling: NuvioDesktopImageScaling = NuvioDesktopImageScaling.Disabled,
 )

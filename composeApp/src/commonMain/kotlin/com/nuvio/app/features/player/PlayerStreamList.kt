@@ -28,6 +28,7 @@ import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamsUiState
 import com.nuvio.app.features.streams.isSelectableForPlayback
 import com.nuvio.app.features.streams.rememberStreamSizeLabelFormat
+import com.nuvio.app.features.streams.sortedForArabicSubtitlePreference
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_no_streams_found
 import org.jetbrains.compose.resources.stringResource
@@ -55,7 +56,7 @@ internal fun PlayerStreamList(
         StreamBadgeSettingsRepository.ensureLoaded()
         StreamBadgeSettingsRepository.uiState
     }.collectAsStateWithLifecycle()
-    val streams = streamsUiState.allStreams
+    val streams = streamsUiState.allStreams.sortedForArabicSubtitlePreference { it } // NUVIO_STREAM_LIST_V9
     val visibleGroups = streamsUiState.filteredGroups
 
     when {
@@ -92,7 +93,7 @@ internal fun PlayerStreamList(
             CompositionLocalProvider(LocalStreamSizeLabelFormat provides formatStreamSize) {
             LazyColumn(
                 modifier = modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
                 contentPadding = contentPadding,
             ) {
                 itemsIndexed(

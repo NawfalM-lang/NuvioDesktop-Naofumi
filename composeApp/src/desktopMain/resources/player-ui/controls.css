@@ -3431,3 +3431,53 @@ svg {
   stroke: none;
   pointer-events: none;
 }
+
+/* NUVIO_SUBTITLE_FULL_RELEASE_NAMES */
+#addonSubtitleList .subtitle-option-metadata {
+    display: block;
+    max-width: 100%;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+
+/* NUVIO_HIDE_RELEASE_NAMES_V61 */
+#addonSubtitleList .subtitle-option-metadata {
+    display: none !important;
+}
+
+
+/* NUVIO_STREAM_BADGES_ONLY_V81: compact badge-only rows when badges exist.
+   The underlying filenames remain available in the title tooltip and player data. */
+.source-row.nuvio-badges-only-v81 .stream-name,
+.source-row.nuvio-badges-only-v81 .stream-subtitle,
+.source-row.nuvio-badges-only-v81 .stream-addon-label,
+.source-row.nuvio-badges-only-v81 .stream-addon-col {
+  display: none !important;
+}
+.source-row.nuvio-badges-only-v81:not(.selected) .track-row-top {
+  display: none !important;
+}
+.track-row.source-row.nuvio-badges-only-v81 {
+  min-height: 52px;
+  padding: 10px 12px;
+  align-items: center;
+}
+.source-row.nuvio-badges-only-v81 .stream-badge-row {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.source-row.nuvio-badges-only-v81 .track-copy {
+  justify-content: center;
+}
+
+/* NUVIO_STREAM_LIST_V9: roomier, easier-to-scan native player stream rows. */
+.track-row.source-row.nuvio-badges-only-v81 {
+  min-height: 74px;
+  padding: 16px 18px;
+}
+.source-row.nuvio-badges-only-v81 .stream-badge-row {
+  gap: 8px;
+  row-gap: 8px;
+}
