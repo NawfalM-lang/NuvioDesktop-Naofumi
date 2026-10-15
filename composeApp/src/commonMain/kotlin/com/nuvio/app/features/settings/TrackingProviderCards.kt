@@ -95,6 +95,9 @@ import nuvio.composeapp.generated.resources.settings_simkl_pin_finish_sign_in
 import nuvio.composeapp.generated.resources.settings_simkl_pin_instructions
 import nuvio.composeapp.generated.resources.settings_simkl_sign_in_description
 import nuvio.composeapp.generated.resources.settings_simkl_sign_in_failed
+import nuvio.composeapp.generated.resources.settings_simkl_invalid_client
+import nuvio.composeapp.generated.resources.settings_simkl_insufficient_scope
+import nuvio.composeapp.generated.resources.settings_simkl_connection_failed
 import nuvio.composeapp.generated.resources.settings_simkl_sync_info_action
 import nuvio.composeapp.generated.resources.settings_simkl_sync_now
 import nuvio.composeapp.generated.resources.settings_simkl_visit
@@ -842,6 +845,12 @@ private fun TrackingBrand.cardBrush(): Brush = when (this) {
 @Composable
 private fun simklErrorMessage(error: SimklAuthError?): String? = when (error) {
     null, SimklAuthError.MISSING_CLIENT_ID -> null
+    SimklAuthError.INVALID_CLIENT ->
+        stringResource(Res.string.settings_simkl_invalid_client)
+    SimklAuthError.INSUFFICIENT_SCOPE ->
+        stringResource(Res.string.settings_simkl_insufficient_scope)
+    SimklAuthError.CONNECTION_FAILED ->
+        stringResource(Res.string.settings_simkl_connection_failed)
     SimklAuthError.INVALID_CALLBACK,
     SimklAuthError.INVALID_CALLBACK_STATE,
     -> stringResource(Res.string.settings_simkl_invalid_callback)

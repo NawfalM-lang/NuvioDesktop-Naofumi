@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_simkl_invalid_client">Simkl rejected the client ID. Configure a public AUTH V2 app, then rebuild Nuvio.</string>
+    <string name="settings_simkl_insufficient_scope">Simkl did not grant permission to update watch history. Reconnect and allow media read and write access.</string>
+    <string name="settings_simkl_connection_failed">Could not reach Simkl. Check your connection and try again.</string>
+</resources>

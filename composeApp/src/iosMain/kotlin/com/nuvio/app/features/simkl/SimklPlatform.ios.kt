@@ -68,6 +68,8 @@ internal actual object SimklPkceCrypto {
 internal actual object SimklAuthStorage {
     private const val METADATA_KEY = "simkl_auth_metadata"
     private const val ACCESS_TOKEN_KEY = "simkl_access_token"
+    private const val REFRESH_TOKEN_KEY = "simkl_refresh_token"
+    private const val DEVICE_CODE_KEY = "simkl_device_code"
     private const val CODE_VERIFIER_KEY = "simkl_code_verifier"
     private const val KEYCHAIN_SERVICE = "com.nuvio.media.simkl"
 
@@ -86,10 +88,20 @@ internal actual object SimklAuthStorage {
 
     actual fun saveCodeVerifier(value: String?) = saveKeychainValue(CODE_VERIFIER_KEY, value)
 
+    actual fun loadRefreshToken(): String? = loadKeychainValue(REFRESH_TOKEN_KEY)
+
+    actual fun saveRefreshToken(value: String?) = saveKeychainValue(REFRESH_TOKEN_KEY, value)
+
+    actual fun loadDeviceCode(): String? = loadKeychainValue(DEVICE_CODE_KEY)
+
+    actual fun saveDeviceCode(value: String?) = saveKeychainValue(DEVICE_CODE_KEY, value)
+
     actual fun removeProfile(profileId: Int) {
         NSUserDefaults.standardUserDefaults.removeObjectForKey(ProfileScopedKey.of(METADATA_KEY, profileId))
         deleteKeychainValue(ACCESS_TOKEN_KEY, profileId)
         deleteKeychainValue(CODE_VERIFIER_KEY, profileId)
+        deleteKeychainValue(REFRESH_TOKEN_KEY, profileId)
+        deleteKeychainValue(DEVICE_CODE_KEY, profileId)
     }
 
     @OptIn(ExperimentalForeignApi::class)
