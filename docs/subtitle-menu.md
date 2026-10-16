@@ -1,6 +1,8 @@
 # Desktop subtitle menu
 
-The Windows native player opens subtitle selection in a compact panel with three tabs:
+The Windows native player opens subtitle selection in a Cinema dark panel with three tabs. The panel is 850 px wide (up from 760 px), with a 630 px maximum height that adapts to the window. A nearly opaque charcoal surface, warm white text, softer dividers and roomier rows keep it readable over video. Selections use the current theme accent.
+
+The three tabs are:
 
 - **Subtitles:** language list, separate built-in and add-on groups, and the current selection. Provider names are prominent in add-on rows. **Details** reveals release names; hovering a row also shows its full information.
 - **Appearance:** a sample subtitle preview, font size, bottom offset and color. Bold, opacity and outline controls sit under **More appearance options**.

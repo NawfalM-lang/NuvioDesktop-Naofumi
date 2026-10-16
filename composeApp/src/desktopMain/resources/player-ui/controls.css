@@ -2263,26 +2263,31 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* Subtitle menu: selection first, with separate appearance and timing views. */
+/* Cinema dark subtitle menu, with separate appearance and timing views. */
 
 #subtitleModal {
+  --theme-text-primary: #f4f1ed;
+  --theme-text-secondary: #c9c5be;
+  --theme-text-muted: #a6a19a;
+  --theme-border-default: rgba(255, 248, 237, .09);
+  color: var(--theme-text-primary);
   padding: 24px clamp(16px, 3vw, 40px) 100px;
-  background: rgba(0, 0, 0, .24);
+  background: rgba(0, 0, 0, .28);
 }
 
 #subtitleModal .subtitle-rail-panel {
   display: flex;
   flex-direction: column;
-  width: min(760px, 100%) !important;
+  width: min(850px, 100%) !important;
   max-width: 100%;
-  height: min(590px, calc(100vh - 140px));
+  height: min(630px, calc(100vh - 136px));
   max-height: none;
   overflow: hidden;
   border: 1px solid var(--theme-border-default);
   border-radius: 20px;
-  background: color-mix(in srgb, var(--theme-surface-elevated) 96%, transparent);
-  box-shadow: 0 18px 70px rgba(0, 0, 0, .4);
-  backdrop-filter: blur(24px);
+  background: rgba(19, 19, 20, .95);
+  box-shadow: 0 28px 88px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 255, 255, .025);
+  backdrop-filter: blur(18px);
 }
 
 .subtitle-menu-header {
@@ -2291,7 +2296,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 22px 24px 18px;
+  padding: 24px 28px 20px;
 }
 
 .subtitle-menu-heading {
@@ -2300,8 +2305,8 @@ button:disabled {
 
 #subtitleModal .track-header {
   padding: 0;
-  font-size: 23px;
-  line-height: 30px;
+  font-size: 25px;
+  line-height: 32px;
   font-weight: 650;
 }
 
@@ -2309,42 +2314,42 @@ button:disabled {
   margin-top: 4px;
   overflow: hidden;
   color: var(--theme-text-muted);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 14px;
+  line-height: 21px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 #subtitleModal .subtitle-close {
-  width: 34px;
-  height: 34px;
-  padding: 8px;
+  width: 38px;
+  height: 38px;
+  padding: 9px;
   border: 0;
   border-radius: 50%;
   background: rgba(255, 255, 255, .06);
 }
 
 .subtitle-close svg {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
 }
 
 .subtitle-menu-tabs {
   display: flex;
   flex: 0 0 auto;
-  gap: 22px;
-  padding: 0 24px;
+  gap: 26px;
+  padding: 0 28px;
   border-bottom: 1px solid var(--theme-border-default);
 }
 
 .subtitle-menu-tab {
-  min-height: 44px;
-  padding: 0 2px 12px;
+  min-height: 48px;
+  padding: 0 3px 14px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--theme-text-muted);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 550;
   cursor: pointer;
 }
@@ -2369,30 +2374,30 @@ button:disabled {
   flex: 1 1 auto;
   width: 100%;
   min-height: 0;
-  grid-template-columns: 170px minmax(0, 1fr);
+  grid-template-columns: 184px minmax(0, 1fr);
   gap: 0;
   overflow: hidden;
 }
 
 #subtitleModal .subtitle-rail {
   gap: 0;
-  padding: 18px 12px 10px;
+  padding: 20px 14px 12px;
   overflow: hidden;
 }
 
 #subtitleModal .subtitle-language-rail {
   border-right: 1px solid var(--theme-border-default);
-  padding-left: 14px;
-  background: rgba(0, 0, 0, .08);
+  padding-left: 16px;
+  background: rgba(0, 0, 0, .12);
 }
 
 #subtitleModal .subtitle-options-rail {
-  padding-right: 16px;
+  padding-right: 20px;
 }
 
 #subtitleModal .subtitle-rail-title {
   padding: 0 10px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 22px;
   font-weight: 550;
   color: var(--theme-text-muted);
@@ -2407,12 +2412,13 @@ button:disabled {
 }
 
 .subtitle-details-toggle {
-  padding: 2px 8px;
+  min-height: 30px;
+  padding: 4px 10px;
   border: 0;
   border-radius: 5px;
   background: transparent;
   color: var(--theme-text-muted);
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -2425,17 +2431,17 @@ button:disabled {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
-  gap: 5px;
-  padding: 10px 0;
+  gap: 6px;
+  padding: 12px 0;
   overscroll-behavior: contain;
 }
 
 #subtitleModal .subtitle-language-row {
-  min-height: 42px;
-  padding: 10px;
+  min-height: 46px;
+  padding: 12px;
   border-radius: 9px;
-  font-size: 14px;
-  line-height: 20px;
+  font-size: 15px;
+  line-height: 22px;
 }
 
 #subtitleModal .subtitle-language-row.selected {
@@ -2449,18 +2455,18 @@ button:disabled {
   padding: 0;
   background: transparent;
   color: var(--theme-text-muted);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 12px;
+  line-height: 18px;
   font-weight: 400;
 }
 
 .subtitle-source-heading {
-  padding: 10px 10px 3px;
+  padding: 14px 14px 4px;
   color: var(--theme-text-muted);
-  font-size: 11px;
-  line-height: 17px;
+  font-size: 12px;
+  line-height: 18px;
   font-weight: 600;
-  letter-spacing: .05em;
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
@@ -2469,14 +2475,15 @@ button:disabled {
 }
 
 #subtitleModal .subtitle-option-row {
-  min-height: 64px !important;
-  padding: 10px 12px !important;
+  min-height: 72px !important;
+  padding: 12px 14px !important;
   border-radius: 10px;
 }
 
 #subtitleModal .subtitle-option-row.selected {
-  border-color: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent) 28%, transparent);
   background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--theme-accent);
   color: var(--theme-text-primary);
   font-weight: 500;
 }
@@ -2486,8 +2493,8 @@ button:disabled {
 }
 
 #subtitleModal .subtitle-option-title {
-  font-size: 15px;
-  line-height: 21px;
+  font-size: 16px;
+  line-height: 23px;
   overflow-wrap: anywhere;
 }
 
@@ -2498,8 +2505,8 @@ button:disabled {
   border-radius: 0;
   background: transparent;
   color: var(--theme-text-muted);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 #subtitleModal .subtitle-option-row.selected .track-check {
@@ -2507,8 +2514,8 @@ button:disabled {
 }
 
 #subtitleModal .track-check {
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
 }
 
 #addonSubtitleList.show-release-details .subtitle-option-metadata,
@@ -2519,15 +2526,15 @@ button:disabled {
   overflow: hidden;
   white-space: normal;
   overflow-wrap: anywhere;
-  font-size: 11px;
-  line-height: 17px;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--theme-text-muted);
 }
 
 #subtitleModal .subtitle-tools-panel {
   flex: 1 1 auto;
   min-height: 0;
-  padding: 20px 24px 24px;
+  padding: 24px 28px 28px;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -2542,7 +2549,7 @@ button:disabled {
 #subtitleModal .style-card {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px 28px;
+  gap: 24px 32px;
 }
 
 #subtitleModal .style-section {
@@ -2558,25 +2565,50 @@ button:disabled {
 
 #subtitleModal .style-label {
   color: var(--theme-text-secondary);
-  font-size: 13px;
-  line-height: 20px;
+  font-size: 14px;
+  line-height: 21px;
 }
 
 #subtitleModal .style-control-row {
   gap: 8px;
 }
 
-#subtitleModal .panel-button {
-  font-size: 12px;
+#subtitleModal .panel-button:not(.subtitle-close) {
+  min-height: 40px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 248, 237, .1);
+  border-radius: 10px;
+  background: rgba(255, 248, 237, .06);
+  color: var(--theme-text-primary);
+  font-size: 13px;
+}
+
+#subtitleModal .panel-button.primary {
+  border-color: transparent;
+  background: var(--theme-accent);
+  color: var(--theme-on-accent);
+}
+
+#subtitleModal .panel-button.primary:hover:not(:disabled) {
+  background: var(--theme-accent-strong);
+}
+
+#subtitleModal .track-row:hover:not(:disabled) {
+  background: rgba(255, 248, 237, .045);
+}
+
+#subtitleModal .subtitle-language-row.selected:hover:not(:disabled),
+#subtitleModal .subtitle-option-row.selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--theme-accent) 17%, transparent);
 }
 
 #subtitleModal .round-step {
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
 }
 
 #subtitleModal .stepper-value {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 #subtitleModal .style-section:has(#subtitleStyleReset) {
@@ -2594,7 +2626,7 @@ button:disabled {
   padding: 20px;
   border: 1px solid var(--theme-border-default);
   border-radius: 12px;
-  background: linear-gradient(140deg, #172e37, #14191f 65%, #25242c);
+  background: linear-gradient(145deg, #202021, #101011);
   text-align: center;
 }
 
@@ -2646,15 +2678,15 @@ button:disabled {
 .subtitle-help {
   margin: 0;
   color: var(--theme-text-muted);
-  font-size: 12px;
-  line-height: 19px;
+  font-size: 13px;
+  line-height: 21px;
 }
 
 .subtitle-sync-status {
   max-width: 100%;
   color: var(--theme-text-secondary);
-  font-size: 12px;
-  line-height: 19px;
+  font-size: 13px;
+  line-height: 21px;
   overflow-wrap: anywhere;
 }
 
