@@ -255,95 +255,131 @@
           <div class="track-list" id="audioTrackList"></div>
         </div>
       </section>
-      <section class="modal-layer player-rail-modal" id="subtitleModal" aria-label="Subtitles" hidden>
+      <section aria-labelledby="subtitlePanelTitle" aria-modal="true" class="modal-layer player-rail-modal" hidden="" id="subtitleModal" role="dialog">
         <div class="track-panel subtitle-rail-panel">
-          <div class="track-header" id="subtitlePanelTitle">Subtitles</div>
-          <div class="subtitle-rails">
+          <div class="subtitle-menu-header">
+            <div class="subtitle-menu-heading">
+              <div class="track-header" id="subtitlePanelTitle">Subtitles</div>
+              <div class="subtitle-current-track" id="subtitleCurrentTrack"></div>
+            </div>
+            <button aria-label="Close subtitles" class="panel-button subtitle-close" id="subtitleCloseButton" type="button">
+              <svg>
+                <use href="#icon-close"></use>
+              </svg>
+            </button>
+          </div>
+          <div aria-label="Subtitle settings" class="subtitle-menu-tabs" role="tablist">
+            <button aria-controls="subtitleTracksPanel" aria-selected="true" class="subtitle-menu-tab" data-subtitle-view="tracks" id="subtitleTracksTab" role="tab" type="button">Subtitles</button>
+            <button aria-controls="subtitleStyleRail" aria-selected="false" class="subtitle-menu-tab" data-subtitle-view="appearance" id="subtitleAppearanceTab" role="tab" tabindex="-1" type="button">Appearance</button>
+            <button aria-controls="subtitleTimingPanel" aria-selected="false" class="subtitle-menu-tab" data-subtitle-view="timing" id="subtitleTimingTab" role="tab" tabindex="-1" type="button">Timing</button>
+          </div>
+          <div aria-labelledby="subtitleTracksTab" class="subtitle-rails" id="subtitleTracksPanel" role="tabpanel">
             <section class="subtitle-rail subtitle-language-rail">
               <div class="subtitle-rail-title" id="subtitleLanguageRailTitle">Languages</div>
               <div class="track-list" id="subtitleTrackList"></div>
             </section>
             <section class="subtitle-rail subtitle-options-rail">
-              <div class="subtitle-rail-title" id="subtitleOptionsRailTitle">Subtitles</div>
+              <div class="subtitle-options-heading">
+                <div class="subtitle-rail-title" id="subtitleOptionsRailTitle">Subtitles</div>
+                <button aria-pressed="false" class="subtitle-details-toggle" id="subtitleDetailsToggle" type="button">Details</button>
+              </div>
               <div class="track-list" id="addonSubtitleList"></div>
             </section>
-            <section class="subtitle-rail subtitle-style-rail" id="subtitleStyleRail" hidden>
-              <div class="subtitle-rail-title" id="subtitleStyleRailTitle">Style</div>
-              <div class="style-panel" id="subtitleStylePanel">
-                <div class="style-card">
-                  <div class="style-section">
-                    <span class="style-label" id="subtitleDelayLabel">Subtitle Delay</span>
-                    <div class="style-control-row">
-                      <div class="stepper">
-                        <button class="round-step" id="subtitleDelayMinus" type="button">-</button>
-                        <span class="stepper-value" id="subtitleDelayValue">+0.000s</span>
-                        <button class="round-step" id="subtitleDelayPlus" type="button">+</button>
-                      </div>
-                      <button class="panel-button" id="subtitleDelayReset" type="button">Reset</button>
-                    </div>
-                  </div>
-                  <div class="style-section style-toggle-section">
-                    <span class="style-label" id="customSubtitleStyleLabel">Use custom styling</span>
-                    <button class="panel-button" id="customSubtitleStyleToggle" type="button">On</button>
-                  </div>
-                  <div class="style-section">
-                    <span class="style-label" id="fontSizeLabel">Font Size</span>
-                    <div class="stepper">
-                      <button class="round-step" id="fontSizeMinus" type="button">-</button>
-                      <span class="stepper-value" id="fontSizeValue">18sp</span>
-                      <button class="round-step" id="fontSizePlus" type="button">+</button>
-                    </div>
-                  </div>
-                  <div class="style-section">
-                    <span class="style-label" id="bottomOffsetLabel">Bottom Offset</span>
-                    <div class="stepper">
-                      <button class="round-step" id="bottomOffsetMinus" type="button">-</button>
-                      <span class="stepper-value" id="bottomOffsetValue">20</span>
-                      <button class="round-step" id="bottomOffsetPlus" type="button">+</button>
-                    </div>
-                  </div>
-                  <div class="custom-subtitle-style-controls" id="customSubtitleStyleControls">
-                    <div class="style-section">
-                      <span class="style-label" id="boldLabel">Bold</span>
-                      <button class="panel-button" id="boldToggle" type="button">Off</button>
-                    </div>
-                    <div class="style-section">
-                      <span class="style-label" id="subtitleColorLabel">Color</span>
-                      <div class="swatch-row" id="subtitleColorSwatches"></div>
-                    </div>
-                    <div class="style-section">
-                      <span class="style-label" id="textOpacityLabel">Text Opacity</span>
-                      <div class="stepper">
-                        <button class="round-step" id="textOpacityMinus" type="button">-</button>
-                        <span class="stepper-value" id="textOpacityValue">100%</span>
-                        <button class="round-step" id="textOpacityPlus" type="button">+</button>
-                      </div>
-                    </div>
-                    <div class="style-section">
-                      <span class="style-label" id="outlineLabel">Outline</span>
-                      <button class="panel-button" id="outlineToggle" type="button">On</button>
-                      <span class="style-label" id="outlineColorLabel">Outline Color</span>
-                      <div class="swatch-row" id="outlineColorSwatches"></div>
-                    </div>
-                  </div>
-                  <div class="style-section">
-                    <span class="style-label" id="autoSyncLabel">Auto Sync</span>
-                    <div class="style-control-row">
-                      <button class="panel-button" id="autoSyncReload" type="button">Reload</button>
-                      <button class="panel-button" id="autoSyncCapture" type="button">Capture</button>
-                      <!-- NUVIO_HYBRID_SYNC_V4 -->
-                      <button class="panel-button" id="hybridSyncButton" type="button" title="Sync to embedded subtitles or video speech">Sync to video</button>
-                    </div>
-                    <div class="stream-subtitle" id="autoSyncStatus"></div>
-                    <div id="autoSyncCueList"></div>
-                  </div>
-                  <div class="style-section">
-                    <button class="panel-button" id="subtitleStyleReset" type="button">Reset Defaults</button>
+          </div>
+          <section aria-labelledby="subtitleAppearanceTab" class="subtitle-tools-panel" hidden="" id="subtitleStyleRail" role="tabpanel">
+            <div class="style-panel" id="subtitleStylePanel">
+              <div class="style-card">
+                <div aria-label="Subtitle appearance preview" class="subtitle-preview">
+                  <span dir="auto" id="subtitlePreviewText">This is how your subtitles will look.</span>
+                </div>
+                <div class="style-section style-toggle-section">
+                  <span class="style-label" id="customSubtitleStyleLabel">Use custom styling</span>
+                  <button class="panel-button" id="customSubtitleStyleToggle" type="button">On</button>
+                </div>
+                <div class="style-section">
+                  <span class="style-label" id="fontSizeLabel">Font Size</span>
+                  <div class="stepper">
+                    <button class="round-step" id="fontSizeMinus" type="button">-</button>
+                    <span class="stepper-value" id="fontSizeValue">18sp</span>
+                    <button class="round-step" id="fontSizePlus" type="button">+</button>
                   </div>
                 </div>
+                <div class="style-section">
+                  <span class="style-label" id="bottomOffsetLabel">Bottom Offset</span>
+                  <div class="stepper">
+                    <button class="round-step" id="bottomOffsetMinus" type="button">-</button>
+                    <span class="stepper-value" id="bottomOffsetValue">20</span>
+                    <button class="round-step" id="bottomOffsetPlus" type="button">+</button>
+                  </div>
+                </div>
+                <div class="custom-subtitle-style-controls" id="customSubtitleStyleControls">
+                  <div class="style-section">
+                    <span class="style-label" id="subtitleColorLabel">Color</span>
+                    <div class="swatch-row" id="subtitleColorSwatches"></div>
+                  </div>
+                  <details class="subtitle-disclosure" id="subtitleAdvancedStyle">
+                    <summary>More appearance options</summary>
+                    <div class="subtitle-advanced-grid">
+                      <div class="style-section">
+                        <span class="style-label" id="boldLabel">Bold</span>
+                        <button class="panel-button" id="boldToggle" type="button">Off</button>
+                      </div>
+                      <div class="style-section">
+                        <span class="style-label" id="textOpacityLabel">Text Opacity</span>
+                        <div class="stepper">
+                          <button class="round-step" id="textOpacityMinus" type="button">-</button>
+                          <span class="stepper-value" id="textOpacityValue">100%</span>
+                          <button class="round-step" id="textOpacityPlus" type="button">+</button>
+                        </div>
+                      </div>
+                      <div class="style-section">
+                        <span class="style-label" id="outlineLabel">Outline</span>
+                        <button class="panel-button" id="outlineToggle" type="button">On</button>
+                        <span class="style-label" id="outlineColorLabel">Outline Color</span>
+                        <div class="swatch-row" id="outlineColorSwatches"></div>
+                      </div>
+                    </div>
+                  </details>
+                </div>
+                <div class="style-section">
+                  <button class="panel-button" id="subtitleStyleReset" type="button">Reset Defaults</button>
+                </div>
               </div>
-            </section>
-          </div>
+            </div>
+          </section>
+          <section aria-labelledby="subtitleTimingTab" class="subtitle-tools-panel" hidden="" id="subtitleTimingPanel" role="tabpanel">
+            <div class="subtitle-timing-grid">
+              <div class="subtitle-timing-card">
+                <div class="style-section">
+                  <span class="style-label" id="subtitleDelayLabel">Subtitle Delay</span>
+                  <div class="style-control-row">
+                    <div class="stepper">
+                      <button class="round-step" id="subtitleDelayMinus" type="button">-</button>
+                      <span class="stepper-value" id="subtitleDelayValue">+0.000s</span>
+                      <button class="round-step" id="subtitleDelayPlus" type="button">+</button>
+                    </div>
+                    <button class="panel-button" id="subtitleDelayReset" type="button">Reset</button>
+                  </div>
+                </div>
+                <p class="subtitle-help">Adjust when the subtitles appear. Each step changes the timing by 0.1 seconds.</p>
+              </div>
+              <div class="subtitle-timing-card">
+                <span class="style-label" id="autoSyncLabel">Auto Sync</span>
+                <p class="subtitle-help">Align an add-on subtitle to the video’s embedded English subtitles.</p>
+                <button class="panel-button primary" id="hybridSyncButton" title="Align to embedded English subtitles" type="button">Sync to video</button>
+                <div aria-live="polite" class="subtitle-sync-status" id="autoSyncStatus" role="status"></div>
+              </div>
+              <details class="subtitle-disclosure" id="subtitleManualSync">
+                <summary>Match a dialogue line</summary>
+                <p class="subtitle-help">Capture the current scene, then choose the subtitle line when it is spoken.</p>
+                <div class="style-control-row">
+                  <button class="panel-button" id="autoSyncReload" type="button">Reload</button>
+                  <button class="panel-button" id="autoSyncCapture" type="button">Capture</button>
+                </div>
+                <div id="autoSyncCueList"></div>
+              </details>
+            </div>
+          </section>
         </div>
       </section>
       <section class="modal-layer player-side-modal" id="sourceModal" aria-label="Sources" hidden>

@@ -2263,6 +2263,498 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* Subtitle menu: selection first, with separate appearance and timing views. */
+
+#subtitleModal {
+  padding: 24px clamp(16px, 3vw, 40px) 100px;
+  background: rgba(0, 0, 0, .24);
+}
+
+#subtitleModal .subtitle-rail-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%) !important;
+  max-width: 100%;
+  height: min(590px, calc(100vh - 140px));
+  max-height: none;
+  overflow: hidden;
+  border: 1px solid var(--theme-border-default);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--theme-surface-elevated) 96%, transparent);
+  box-shadow: 0 18px 70px rgba(0, 0, 0, .4);
+  backdrop-filter: blur(24px);
+}
+
+.subtitle-menu-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px 18px;
+}
+
+.subtitle-menu-heading {
+  min-width: 0;
+}
+
+#subtitleModal .track-header {
+  padding: 0;
+  font-size: 23px;
+  line-height: 30px;
+  font-weight: 650;
+}
+
+.subtitle-current-track {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--theme-text-muted);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#subtitleModal .subtitle-close {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .06);
+}
+
+.subtitle-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.subtitle-menu-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 22px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--theme-border-default);
+}
+
+.subtitle-menu-tab {
+  min-height: 44px;
+  padding: 0 2px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--theme-text-muted);
+  font-size: 14px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.subtitle-menu-tab:hover {
+  color: var(--theme-text-primary);
+}
+
+.subtitle-menu-tab[aria-selected="true"] {
+  border-bottom-color: var(--theme-accent);
+  color: var(--theme-text-primary);
+}
+
+.subtitle-menu-tab:focus-visible, .subtitle-details-toggle:focus-visible, .subtitle-disclosure summary:focus-visible {
+  outline: 2px solid var(--theme-focus);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+#subtitleModal .subtitle-rails {
+  display: grid;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+}
+
+#subtitleModal .subtitle-rail {
+  gap: 0;
+  padding: 18px 12px 10px;
+  overflow: hidden;
+}
+
+#subtitleModal .subtitle-language-rail {
+  border-right: 1px solid var(--theme-border-default);
+  padding-left: 14px;
+  background: rgba(0, 0, 0, .08);
+}
+
+#subtitleModal .subtitle-options-rail {
+  padding-right: 16px;
+}
+
+#subtitleModal .subtitle-rail-title {
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 22px;
+  font-weight: 550;
+  color: var(--theme-text-muted);
+}
+
+.subtitle-options-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+}
+
+.subtitle-details-toggle {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--theme-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.subtitle-details-toggle:hover, .subtitle-details-toggle[aria-pressed="true"] {
+  color: var(--theme-text-primary);
+  background: rgba(255, 255, 255, .07);
+}
+
+#subtitleModal .track-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  gap: 5px;
+  padding: 10px 0;
+  overscroll-behavior: contain;
+}
+
+#subtitleModal .subtitle-language-row {
+  min-height: 42px;
+  padding: 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+#subtitleModal .subtitle-language-row.selected {
+  background: color-mix(in srgb, var(--theme-accent) 15%, transparent);
+  color: var(--theme-text-primary);
+  font-weight: 600;
+}
+
+#subtitleModal .subtitle-count {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--theme-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 400;
+}
+
+.subtitle-source-heading {
+  padding: 10px 10px 3px;
+  color: var(--theme-text-muted);
+  font-size: 11px;
+  line-height: 17px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.subtitle-source-heading:first-child {
+  padding-top: 0;
+}
+
+#subtitleModal .subtitle-option-row {
+  min-height: 64px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px;
+}
+
+#subtitleModal .subtitle-option-row.selected {
+  border-color: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--theme-accent) 12%, transparent);
+  color: var(--theme-text-primary);
+  font-weight: 500;
+}
+
+#subtitleModal .subtitle-option-copy {
+  gap: 4px;
+}
+
+#subtitleModal .subtitle-option-title {
+  font-size: 15px;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+#subtitleModal .subtitle-source-chip {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--theme-text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+#subtitleModal .subtitle-option-row.selected .track-check {
+  color: var(--theme-accent);
+}
+
+#subtitleModal .track-check {
+  width: 19px;
+  height: 19px;
+}
+
+#addonSubtitleList.show-release-details .subtitle-option-metadata,
+#addonSubtitleList .subtitle-option-row[data-subtitle-kind="builtIn"] .subtitle-option-metadata {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 17px;
+  color: var(--theme-text-muted);
+}
+
+#subtitleModal .subtitle-tools-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 20px 24px 24px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+#subtitleModal .style-panel {
+  padding: 0;
+  overflow: visible;
+  max-height: none;
+}
+
+#subtitleModal .style-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 28px;
+}
+
+#subtitleModal .style-section {
+  gap: 10px;
+}
+
+#subtitleModal .style-toggle-section {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#subtitleModal .style-label {
+  color: var(--theme-text-secondary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+#subtitleModal .style-control-row {
+  gap: 8px;
+}
+
+#subtitleModal .panel-button {
+  font-size: 12px;
+}
+
+#subtitleModal .round-step {
+  width: 34px;
+  height: 34px;
+}
+
+#subtitleModal .stepper-value {
+  font-size: 14px;
+}
+
+#subtitleModal .style-section:has(#subtitleStyleReset) {
+  grid-column: 1 / -1;
+  padding-top: 16px;
+  border-top: 1px solid var(--theme-border-default);
+}
+
+.subtitle-preview {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  padding: 20px;
+  border: 1px solid var(--theme-border-default);
+  border-radius: 12px;
+  background: linear-gradient(140deg, #172e37, #14191f 65%, #25242c);
+  text-align: center;
+}
+
+#subtitlePreviewText {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.subtitle-disclosure {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-top: 1px solid var(--theme-border-default);
+  padding-top: 16px;
+}
+
+.subtitle-disclosure summary {
+  padding: 2px 0;
+  color: var(--theme-text-secondary);
+  font-size: 13px;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.subtitle-disclosure summary:hover {
+  color: var(--theme-text-primary);
+}
+
+.subtitle-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  padding-top: 18px;
+}
+
+.subtitle-timing-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 22px;
+}
+
+.subtitle-timing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.subtitle-help {
+  margin: 0;
+  color: var(--theme-text-muted);
+  font-size: 12px;
+  line-height: 19px;
+}
+
+.subtitle-sync-status {
+  max-width: 100%;
+  color: var(--theme-text-secondary);
+  font-size: 12px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
+}
+
+.subtitle-sync-status:empty {
+  display: none;
+}
+
+#subtitleManualSync .subtitle-help {
+  margin: 12px 0;
+}
+
+#subtitleManualSync #autoSyncCueList {
+  margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+  #subtitleModal {
+    padding: 12px 12px 76px;
+  }
+
+  #subtitleModal .subtitle-rail-panel {
+    height: calc(100vh - 100px);
+    border-radius: 16px;
+  }
+
+  .subtitle-menu-header {
+    padding: 16px 18px 12px;
+  }
+
+  .subtitle-menu-tabs {
+    padding: 0 18px;
+    gap: 20px;
+  }
+
+  #subtitleModal .subtitle-rails {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  #subtitleModal .subtitle-language-rail {
+    padding: 10px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--theme-border-default);
+  }
+
+  #subtitleModal .subtitle-language-rail > .subtitle-rail-title {
+    display: none;
+  }
+
+  #subtitleModal #subtitleTrackList {
+    flex-direction: row;
+    overflow-x: auto;
+    flex: 0 0 auto;
+    padding: 0;
+  }
+
+  #subtitleModal .subtitle-language-row {
+    width: auto;
+    flex: 0 0 auto;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  #subtitleModal .subtitle-options-rail {
+    padding: 12px;
+  }
+
+  #subtitleModal .subtitle-tools-panel {
+    padding: 18px;
+  }
+
+  #subtitleModal .style-card, .subtitle-timing-grid, .subtitle-advanced-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+}
+
+@media (max-height: 520px) {
+  #subtitleModal {
+    padding-top: 12px;
+    padding-bottom: 50px;
+  }
+
+  #subtitleModal .subtitle-rail-panel {
+    height: calc(100vh - 74px);
+  }
+
+  .subtitle-menu-header {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+
+  #subtitleModal .track-header {
+    font-size: 20px;
+    line-height: 26px;
+  }
+
+}
+
+
 .style-panel {
   display: flex;
   flex-direction: column;
