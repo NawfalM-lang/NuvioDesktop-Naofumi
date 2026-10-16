@@ -2,7 +2,7 @@ name: Subtitle menu UI
 
 on:
   push:
-    branches: [improve-subtitle-menu]
+    branches: [improve-subtitle-menu, cinema-dark-subtitle-menu]
   workflow_dispatch:
 
 permissions:
