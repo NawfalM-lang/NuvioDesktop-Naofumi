@@ -11,7 +11,9 @@ import urllib.error
 from contextlib import redirect_stdout
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from fractions import Fraction
 
 import srt
 
@@ -168,7 +170,7 @@ class AlignmentTests(unittest.TestCase):
         self.assertEqual(len(windows), 3)
         self.assertLess(windows[0][1], windows[1][0])
         self.assertGreater(windows[-1][0], 2000)
-        self.assertTrue(all(b - a <= 120 for a, b in windows))
+        self.assertTrue(all(b - a <= 60 for a, b in windows))
         self.assertEqual(worker.sample_windows(90), [(0.0, 90)])
 
     def test_unknown_or_unbounded_duration_cannot_silently_use_only_the_intro(self):
@@ -282,6 +284,63 @@ class AlignmentTests(unittest.TestCase):
             for actual, expected in zip(worker.read_cues(root / 'synced.srt'), worker.read_cues(source)):
                 self.assertEqual(actual.start, expected.start)
                 self.assertEqual(actual.content, expected.content)
+
+    def media_with_sparse_subtitles(self):
+        subtitle = SimpleNamespace(start_display_time=0, end_display_time=2000,
+                                   rects=[SimpleNamespace(dialogue=b'English dialogue')])
+        stream = SimpleNamespace(index=2, type='subtitle', decode2=lambda packet: subtitle)
+        video = SimpleNamespace(index=0, type='video')
+        media = MagicMock()
+
+        def packets():
+            yield SimpleNamespace(stream=stream, pts=10000, dts=None, duration=2000,
+                                  time_base=Fraction(1, 1000), size=12)
+            yield SimpleNamespace(stream=video, pts=20000, dts=None,
+                                  time_base=Fraction(1, 1000), size=1000)
+            self.fail('Read beyond the requested window while waiting for a later subtitle')
+
+        media.__enter__.return_value.demux.side_effect = packets
+        return media
+
+    def test_extraction_stops_on_video_clock_without_decoding_video(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = pathlib.Path(tmp) / 'reference.srt'
+            with patch('av.open', return_value=self.media_with_sparse_subtitles()):
+                actual = worker.extract_reference_window('https://private/video', 2, 0, 20, output, None)
+            self.assertEqual(len(actual), 1)
+            self.assertEqual(actual[0].start.total_seconds(), 10)
+            self.assertEqual(actual[0].end.total_seconds(), 12)
+
+    def test_transient_media_failure_retries_and_discards_failed_attempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = pathlib.Path(tmp) / 'reference.srt'
+            with patch('av.open', side_effect=[OSError('private signed URL'), self.media_with_sparse_subtitles()]) as opened, \
+                 redirect_stdout(io.StringIO()):
+                actual = worker.extract_reference_window('https://private/video', 2, 0, 20, output, None)
+            self.assertEqual(opened.call_count, 2)
+            self.assertEqual(len(actual), 1)
+
+    def test_exhausted_media_reads_fail_without_output_or_private_errors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = pathlib.Path(tmp) / 'reference.srt'
+            with patch('av.open', side_effect=OSError('https://private/?token=secret')) as opened, \
+                 redirect_stdout(io.StringIO()):
+                with self.assertRaises(worker.SyncError) as caught:
+                    worker.extract_reference_window('https://private/video', 2, 0, 20, output, None)
+            self.assertEqual(opened.call_count, 2)
+            self.assertNotIn('secret', str(caught.exception))
+            self.assertFalse(output.exists())
+
+    def test_expired_shared_deadline_does_not_start_another_attempt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = pathlib.Path(tmp) / 'reference.srt'
+            with patch('av.open', side_effect=OSError('private')) as opened, \
+                 patch.object(worker.time, 'monotonic', side_effect=[0, 0, 31]), \
+                 redirect_stdout(io.StringIO()):
+                with self.assertRaises(worker.SyncError):
+                    worker.extract_reference_window('https://private/video', 2, 0, 20, output, None)
+            self.assertEqual(opened.call_count, 1)
+            self.assertFalse(output.exists())
 
     def test_download_errors_do_not_expose_urls(self):
         with tempfile.TemporaryDirectory() as tmp:

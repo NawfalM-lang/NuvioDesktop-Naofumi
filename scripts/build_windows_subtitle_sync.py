@@ -101,6 +101,7 @@ def main():
     (notices / 'UPSTREAM-SOURCES.txt').write_text(
         'Python: https://www.python.org/downloads/source/\n'
         'FFsubsync: https://github.com/smacke/ffsubsync/tree/0.5.1\n'
+        'PyAV: https://github.com/PyAV-Org/PyAV/tree/v19.0.1\n'
         'FFmpeg Windows build: ' + FFMPEG_URL + '\n'
         'FFmpeg archive SHA256: ' + FFMPEG_SHA256 + '\n'
         'FFmpeg build/source information: https://www.gyan.dev/ffmpeg/builds/\n'
@@ -111,7 +112,8 @@ def main():
     worker = ROOT / 'composeApp/src/desktopMain/resources/nuvio/audio_sync_worker.py'
     run([python, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--console',
          '--name', NAME, '--distpath', work / 'dist', '--workpath', work / 'pyinstaller',
-         '--specpath', work, '--collect-all', 'ffsubsync',
+         '--specpath', work, '--collect-all', 'ffsubsync', '--collect-all', 'av',
+         '--recursive-copy-metadata', 'av',
          '--additional-hooks-dir', ROOT / 'scripts/pyinstaller-hooks',
          '--recursive-copy-metadata', 'ffsubsync',
          '--add-binary', str(ffmpeg / 'ffmpeg.exe') + os.pathsep + 'bin',
@@ -131,7 +133,7 @@ def main():
     shutil.copytree(bundle, output)
     manifest = {
         'python': platform.python_version(), 'architecture': 'windows-x64',
-        'ffsubsync': '0.5.1', 'ffmpeg': '8.1.2',
+        'ffsubsync': '0.5.1', 'ffmpeg': '8.1.2', 'pyav': '19.0.1',
         'ffmpeg_archive_sha256': FFMPEG_SHA256,
         'self_test': 'passed',
     }

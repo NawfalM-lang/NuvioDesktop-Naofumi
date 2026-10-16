@@ -1,5 +1,6 @@
 # Windows subtitle runtime. Update together with the bundle self-test.
 ffsubsync==0.5.1
+av==19.0.1
 auditok==0.1.5
 chardet==7.6.0
 charset-normalizer==3.5.2
