@@ -1000,12 +1000,27 @@ tasks.withType<Jar>().configureEach {
     }
 }
 
-tasks.matching { it.name == "prepareAppResources" }.configureEach {
+tasks.withType<Sync>().matching { it.name == "prepareAppResources" }.configureEach {
     if (isMacHost) {
         dependsOn(prepareMacosPlayerAppResources)
     }
     if (isWindowsHost) {
         dependsOn(buildWindowsSubtitleSync)
+        doLast {
+            // Compose removes the OS selector directory while merging app resources.
+            // Verify the layout consumed by the installed runtime resolver, not the build tree.
+            val requiredSubtitleFiles = listOf(
+                "subtitle-sync/nuvio-subtitle-sync.exe",
+                "subtitle-sync/bundle-manifest.json",
+                "subtitle-sync/_internal/bin/ffmpeg.exe",
+                "subtitle-sync/_internal/bin/ffprobe.exe",
+            )
+            requiredSubtitleFiles.forEach { relativePath ->
+                check(destinationDir.resolve(relativePath).isFile) {
+                    "Prepared Windows app resources are missing $relativePath in $destinationDir"
+                }
+            }
+        }
     }
 }
 

@@ -13,12 +13,22 @@ internal object DesktopSubtitleSyncRuntime {
         workingDirectory: Path = Path.of(System.getProperty("user.dir")),
     ): List<String> {
         val explicit = overrideDirectory?.takeIf(String::isNotBlank)?.let(Path::of)
-        val packaged = resourcesDirectory?.takeIf(String::isNotBlank)
-            ?.let { Path.of(it, "windows", "subtitle-sync") }
-        val directory = explicit ?: packaged
-        if (directory != null) {
-            val executable = directory.resolve("nuvio-subtitle-sync.exe")
-            check(Files.isRegularFile(executable)) {
+        val packagedRoot = resourcesDirectory?.takeIf(String::isNotBlank)?.let(Path::of)
+        val candidates = when {
+            explicit != null -> listOf(explicit)
+            packagedRoot != null -> listOf(
+                // Compose merges appResourcesRootDir/windows into the resources root.
+                packagedRoot.resolve("subtitle-sync"),
+                // Keep compatibility with manually staged, unflattened resource trees.
+                packagedRoot.resolve("windows/subtitle-sync"),
+            )
+            else -> emptyList()
+        }
+        if (candidates.isNotEmpty()) {
+            val executable = candidates.asSequence()
+                .map { it.resolve("nuvio-subtitle-sync.exe") }
+                .firstOrNull(Files::isRegularFile)
+            check(executable != null) {
                 "Bundled subtitle runtime is missing. Reinstall this Nuvio build."
             }
             return listOf(executable.toAbsolutePath().toString(), job.toString())

@@ -510,9 +510,11 @@ jobs:
             throw "MSI administrative extraction failed with exit code $($extractProcess.ExitCode)."
           }
 
-          $subtitleRuntime = Get-ChildItem $extractDir -Recurse -Filter "nuvio-subtitle-sync.exe" | Select-Object -First 1
+          $subtitleRuntime = Get-ChildItem $extractDir -Recurse -Filter "nuvio-subtitle-sync.exe" `
+            | Where-Object { $_.FullName -match "[\\/]app[\\/]resources[\\/]subtitle-sync[\\/]nuvio-subtitle-sync\.exe$" } `
+            | Select-Object -First 1
           if ($null -eq $subtitleRuntime) {
-            throw "The MSI is missing the private subtitle runtime."
+            throw "The MSI is missing app/resources/subtitle-sync/nuvio-subtitle-sync.exe."
           }
           $savedPath = $env:Path
           try {
