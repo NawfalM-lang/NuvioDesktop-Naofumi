@@ -85,7 +85,15 @@ const subtitlePanelTitle = document.getElementById("subtitlePanelTitle");
 const subtitleLanguageRailTitle = document.getElementById("subtitleLanguageRailTitle");
 const subtitleOptionsRailTitle = document.getElementById("subtitleOptionsRailTitle");
 const subtitleStyleRail = document.getElementById("subtitleStyleRail");
-const subtitleStyleRailTitle = document.getElementById("subtitleStyleRailTitle");
+const subtitleTracksPanel = document.getElementById("subtitleTracksPanel");
+const subtitleTimingPanel = document.getElementById("subtitleTimingPanel");
+const subtitleMenuTabs = Array.from(document.querySelectorAll("[data-subtitle-view]"));
+const subtitleCurrentTrack = document.getElementById("subtitleCurrentTrack");
+const subtitleCloseButton = document.getElementById("subtitleCloseButton");
+const subtitleDetailsToggle = document.getElementById("subtitleDetailsToggle");
+const subtitlePreviewText = document.getElementById("subtitlePreviewText");
+let activeSubtitleView = "tracks";
+let subtitleDetailsVisible = false;
 const addonSubtitleList = document.getElementById("addonSubtitleList");
 const subtitleStylePanel = document.getElementById("subtitleStylePanel");
 const customSubtitleStyleLabel = document.getElementById("customSubtitleStyleLabel");
@@ -1025,6 +1033,7 @@ const openPlayerModal = modal => {
     }
   }
   if (modal === "subtitles") {
+    activeSubtitleView = "tracks";
     resetSubtitleSelectionState();
   }
   renderActiveModal();
@@ -1032,6 +1041,11 @@ const openPlayerModal = modal => {
     setModalVisibility(modalElement, modalElement === targetModal);
   });
   renderChrome();
+  if (modal === "subtitles") {
+    window.requestAnimationFrame(() => {
+      if (activeModal === "subtitles") subtitleMenuTabs.find(tab => tab.getAttribute("aria-selected") === "true")?.focus({ preventScroll: true });
+    });
+  }
 };
 
 const onEpisodesModalClosed = () => {
@@ -1195,9 +1209,12 @@ const appendSubtitleLanguageRow = item => {
   const row = document.createElement("button");
   row.type = "button";
   row.className = `track-row subtitle-language-row${item.key === activeSubtitleLanguageKey ? " selected" : ""}`;
+  row.dataset.subtitleLanguage = item.key;
+  row.setAttribute("aria-pressed", String(item.key === activeSubtitleLanguageKey));
   row.addEventListener("click", event => {
     event.stopPropagation();
     activeSubtitleLanguageKey = item.key;
+    addonSubtitleList.scrollTop = 0;
     const options = subtitleSelectionOptions().filter(option => option.languageKey === item.key);
     pendingSubtitleOptionId = options.some(option => option.id === pendingSubtitleOptionId) ? pendingSubtitleOptionId : "";
     if (item.key === "__off__") send("selectBuiltInSubtitleTrack", -1);
@@ -1227,6 +1244,10 @@ const appendSubtitleOptionRow = option => {
   const row = document.createElement("button");
   row.type = "button";
   row.className = `track-row subtitle-option-row${selected ? " selected" : ""}`;
+  row.dataset.subtitleOption = option.id;
+  row.dataset.subtitleKind = option.kind;
+  row.setAttribute("aria-pressed", String(selected));
+  row.title = [option.title, option.sourceLabel, option.metadata].filter(Boolean).join("\n");
   row.addEventListener("click", event => {
     event.stopPropagation();
     pendingSubtitleOptionId = option.id;
@@ -1238,15 +1259,17 @@ const appendSubtitleOptionRow = option => {
   copy.className = "subtitle-option-copy";
   const source = document.createElement("span");
   source.className = "subtitle-source-chip";
-  source.textContent = option.sourceLabel;
-  copy.appendChild(source);
+  source.textContent = option.title;
   const title = document.createElement("span");
   title.className = "subtitle-option-title";
-  title.textContent = option.title;
+  title.dir = "auto";
+  title.textContent = option.kind === "addon" ? (option.sourceLabel || option.title) : option.title;
   copy.appendChild(title);
+  if (option.kind === "addon") copy.appendChild(source);
   if (option.metadata) {
     const metadata = document.createElement("span");
     metadata.className = "subtitle-option-metadata";
+    metadata.dir = "auto";
     metadata.textContent = option.metadata;
     copy.appendChild(metadata);
   }
@@ -1275,6 +1298,10 @@ const appendSubtitleOptionsEmptyState = (label, fetch = false) => {
 };
 
 const renderSubtitleSelectionRails = () => {
+  const focusedLanguage = document.activeElement?.dataset.subtitleLanguage;
+  const focusedOption = document.activeElement?.dataset.subtitleOption;
+  const languageScroll = subtitleTrackList.scrollTop;
+  const optionScroll = addonSubtitleList.scrollTop;
   const options = subtitleSelectionOptions();
   const languages = subtitleLanguages();
   const selected = selectedSubtitleOption(options);
@@ -1292,17 +1319,34 @@ const renderSubtitleSelectionRails = () => {
   if (activeSubtitleLanguageKey === "__off__") {
     appendSubtitleOptionsEmptyState(state.noneLabel || "None");
   } else if (activeOptions.length > 0) {
-    activeOptions.forEach(appendSubtitleOptionRow);
+    ["builtIn", "addon"].forEach(kind => {
+      const group = activeOptions.filter(option => option.kind === kind);
+      if (!group.length) return;
+      const heading = document.createElement("div");
+      heading.className = "subtitle-source-heading";
+      heading.textContent = kind === "builtIn"
+        ? (state.subtitleBuiltInTabLabel || "Built-in") : (state.subtitleAddonsTabLabel || "Add-ons");
+      addonSubtitleList.appendChild(heading);
+      group.forEach(appendSubtitleOptionRow);
+    });
   } else if (state.isLoadingAddonSubtitles) {
     appendSubtitleOptionsEmptyState("Loading subtitles...");
   } else {
     appendSubtitleOptionsEmptyState(state.fetchSubtitlesLabel || "Tap to fetch subtitles", true);
   }
-  const styleVisible = activeSubtitleLanguageKey !== "__off__" && activeOptions.some(option =>
-    option.id === pendingSubtitleOptionId || (!pendingSubtitleOptionId && option.selected));
-  subtitleStyleRail.hidden = !styleVisible;
-  subtitleStyleRail.parentElement.classList.toggle("style-visible", styleVisible);
-  if (styleVisible) renderSubtitleStylePanel();
+  subtitleTrackList.scrollTop = languageScroll;
+  addonSubtitleList.scrollTop = optionScroll;
+  if (focusedLanguage !== undefined || focusedOption !== undefined) {
+    const replacement = Array.from(subtitleModal.querySelectorAll(".track-row")).find(row =>
+      focusedOption !== undefined ? row.dataset.subtitleOption === focusedOption
+        : row.dataset.subtitleLanguage === focusedLanguage);
+    replacement?.focus({ preventScroll: true });
+  }
+  const currentLabel = selected
+    ? [selected.title, selected.sourceLabel].filter(Boolean).join(" · ") : (state.noneLabel || "None");
+  if (subtitleCurrentTrack.textContent !== currentLabel) subtitleCurrentTrack.textContent = currentLabel;
+  renderSubtitleStylePanel();
+  renderSubtitleMenuView();
 };
 
 const formatDelay = delayMs => {
@@ -1339,6 +1383,8 @@ const renderSwatches = (container, colors, selectedColor, eventType) => {
     swatch.type = "button";
     swatch.className = `swatch${parsed.alpha === 0 ? " transparent" : ""}${sameRgb(color, selectedColor) ? " selected" : ""}`;
     swatch.style.setProperty("--swatch", parsed.css);
+    swatch.setAttribute("aria-label", String(color));
+    swatch.setAttribute("aria-pressed", String(sameRgb(color, selectedColor)));
     swatch.addEventListener("click", event => {
       event.stopPropagation();
       send(eventType, index);
@@ -1351,6 +1397,7 @@ const renderAutoSyncCues = () => {
   autoSyncCueList.textContent = "";
   autoSyncReload.disabled = !state.hasSelectedAddonSubtitle;
   autoSyncCapture.disabled = !state.hasSelectedAddonSubtitle;
+  hybridSyncButton.disabled = !state.hasSelectedAddonSubtitle;
   if (!state.hasSelectedAddonSubtitle) {
     autoSyncStatus.textContent = state.selectAddonSubtitleFirstLabel || "Select an addon subtitle first";
     return;
@@ -1412,9 +1459,11 @@ const renderSubtitleStylePanel = () => {
   outlineLabel.textContent = state.outlineLabel || "Outline";
   outlineToggle.textContent = style.outlineEnabled ? (state.onLabel || "On") : (state.offLabel || "Off");
   outlineToggle.classList.toggle("primary", Boolean(style.outlineEnabled));
+  outlineToggle.setAttribute("aria-pressed", String(Boolean(style.outlineEnabled)));
   boldLabel.textContent = state.boldLabel || "Bold";
   boldToggle.textContent = style.bold ? (state.onLabel || "On") : (state.offLabel || "Off");
   boldToggle.classList.toggle("primary", Boolean(style.bold));
+  boldToggle.setAttribute("aria-pressed", String(Boolean(style.bold)));
   bottomOffsetLabel.textContent = state.bottomOffsetLabel || "Bottom Offset";
   bottomOffsetValue.textContent = String(Number(style.bottomOffset) || 0);
   subtitleColorLabel.textContent = state.colorLabel || "Color";
@@ -1425,14 +1474,46 @@ const renderSubtitleStylePanel = () => {
   subtitleStyleReset.textContent = state.resetDefaultsLabel || "Reset Defaults";
   renderSwatches(subtitleColorSwatches, state.subtitleColorSwatches, style.textColor, "subtitleTextColor");
   renderSwatches(outlineColorSwatches, state.subtitleOutlineColorSwatches, style.outlineColor, "subtitleOutlineColor");
+  customSubtitleStyleControls.querySelectorAll("button").forEach(button => { button.disabled = !customStylingEnabled; });
+  customSubtitleStyleControls.querySelectorAll("summary").forEach(summary => { summary.tabIndex = customStylingEnabled ? 0 : -1; });
+  subtitlePreviewText.textContent = String(state.selectedSubtitleLanguageKey).startsWith("ar")
+    ? "هكذا ستظهر الترجمة على الشاشة" : "This is how your subtitles will look.";
+  subtitlePreviewText.style.fontSize = `${Math.max(14, Math.min(38, Number(style.fontSizeSp) || 18))}px`;
+  subtitlePreviewText.style.fontWeight = customStylingEnabled && style.bold ? "700" : "400";
+  subtitlePreviewText.style.color = customStylingEnabled ? parseArgb(style.textColor || "#FFFFFFFF").css : "#fff";
+  const outlineColor = parseArgb(style.outlineColor || "#FF000000").css;
+  subtitlePreviewText.style.textShadow = customStylingEnabled && style.outlineEnabled
+    ? `1px 1px 0 ${outlineColor}, -1px -1px 0 ${outlineColor}, 1px -1px 0 ${outlineColor}, -1px 1px 0 ${outlineColor}` : "none";
+  [[subtitleDelayMinus, subtitleDelayPlus, subtitleDelayLabel],
+    [fontSizeMinus, fontSizePlus, fontSizeLabel], [bottomOffsetMinus, bottomOffsetPlus, bottomOffsetLabel],
+    [textOpacityMinus, textOpacityPlus, textOpacityLabel]].forEach(([minus, plus, label]) => {
+    minus.setAttribute("aria-label", `${label.textContent}: decrease`);
+    plus.setAttribute("aria-label", `${label.textContent}: increase`);
+  });
   renderAutoSyncCues();
+};
+
+const renderSubtitleMenuView = () => {
+  subtitleMenuTabs.forEach(tab => {
+    const selected = tab.dataset.subtitleView === activeSubtitleView;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+  subtitleTracksPanel.hidden = activeSubtitleView !== "tracks";
+  subtitleStyleRail.hidden = activeSubtitleView !== "appearance";
+  subtitleTimingPanel.hidden = activeSubtitleView !== "timing";
+  addonSubtitleList.classList.toggle("show-release-details", subtitleDetailsVisible);
+  subtitleDetailsToggle.setAttribute("aria-pressed", String(subtitleDetailsVisible));
 };
 
 const renderSubtitleModal = () => {
   subtitlePanelTitle.textContent = state.subtitlesPanelTitle || "Subtitles";
   subtitleLanguageRailTitle.textContent = state.subtitleLanguagesLabel || "Languages";
-  subtitleOptionsRailTitle.textContent = state.subtitlesPanelTitle || "Subtitles";
-  subtitleStyleRailTitle.textContent = state.subtitleStyleTabLabel || "Style";
+  subtitleOptionsRailTitle.textContent = subtitleLanguages().find(item => item.key === activeSubtitleLanguageKey)?.label || state.subtitlesPanelTitle || "Subtitles";
+  document.getElementById("subtitleTracksTab").textContent = state.subtitlesPanelTitle || "Subtitles";
+  document.getElementById("subtitleAppearanceTab").textContent = state.subtitleAppearanceTabLabel || "Appearance";
+  document.getElementById("subtitleTimingTab").textContent = state.subtitleTimingTabLabel || "Timing";
+  subtitleCloseButton.setAttribute("aria-label", state.panelCloseLabel || "Close subtitles");
   renderSubtitleSelectionRails();
 };
 
@@ -2877,6 +2958,47 @@ modalElements.forEach(modal => {
     }
     if (event.target === modal) closePlayerModal(true);
   });
+});
+
+subtitleMenuTabs.forEach((tab, index) => {
+  const activate = () => {
+    activeSubtitleView = tab.dataset.subtitleView;
+    renderSubtitleMenuView();
+  };
+  tab.addEventListener("click", event => { event.stopPropagation(); activate(); });
+  tab.addEventListener("keydown", event => {
+    const keys = ["ArrowLeft", "ArrowRight", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? subtitleMenuTabs.length - 1
+      : (index + (event.key === "ArrowRight" ? 1 : -1) + subtitleMenuTabs.length) % subtitleMenuTabs.length;
+    activeSubtitleView = subtitleMenuTabs[nextIndex].dataset.subtitleView;
+    renderSubtitleMenuView();
+    subtitleMenuTabs[nextIndex].focus();
+  });
+});
+subtitleCloseButton.addEventListener("click", event => {
+  event.stopPropagation();
+  closePlayerModal(true);
+  focusShortcutRoot();
+});
+subtitleDetailsToggle.addEventListener("click", event => {
+  event.stopPropagation();
+  subtitleDetailsVisible = !subtitleDetailsVisible;
+  renderSubtitleMenuView();
+});
+subtitleModal.addEventListener("keydown", event => {
+  if (event.key !== "Tab" || event.ctrlKey || event.metaKey || event.altKey) return;
+  const focusable = Array.from(subtitleModal.querySelectorAll("button, input, summary, [tabindex]"))
+    .filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length > 0);
+  if (!focusable.length) return;
+  const index = focusable.indexOf(document.activeElement);
+  if (event.shiftKey && index <= 0) {
+    event.preventDefault(); focusable[focusable.length - 1].focus();
+  } else if (!event.shiftKey && (index < 0 || index === focusable.length - 1)) {
+    event.preventDefault(); focusable[0].focus();
+  }
 });
 
 subtitleDelayMinus.addEventListener("click", event => {
