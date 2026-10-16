@@ -13,7 +13,7 @@ internal suspend fun awaitSubtitleSyncProcess(process: Process, timeoutMillis: L
         while (process.isAlive) {
             currentCoroutineContext().ensureActive()
             check(System.nanoTime() < deadline) {
-                "Subtitle sync timed out; choose a matching English add-on reference"
+                "Subtitle sync timed out; try another stream or a downloaded copy; original subtitle kept"
             }
             delay(50)
         }

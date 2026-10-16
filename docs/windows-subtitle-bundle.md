@@ -1,7 +1,7 @@
 # Windows subtitle synchronization bundle
 
 The Windows installer includes a private subtitle executable, Python runtime,
-FFsubsync 0.5.1 and FFmpeg/FFprobe 8.1.2. End users do not need Python, pip, a PATH
+FFsubsync 0.5.1, PyAV 19.0.1 and FFmpeg/FFprobe 8.1.2. End users do not need Python, pip, a PATH
 change, or a separate FFmpeg installation. Subtitle URLs and media still require
 network access; no dependencies are downloaded when synchronization starts.
 
@@ -70,11 +70,16 @@ The worker uses FFsubsync 0.5.1 with these additional checks:
   subtitles can leave both out of sync with the video. If embedded English cannot
   be read (including streams needing custom headers), fail and keep the original.
   Forced-only English tracks are excluded; ordinary dialogue is preferred to SDH.
-- Embedded references sample up to two minutes each near 10%, 50%, and 90% of
-  the timeline, in parallel with bounded extraction timeouts. Short videos use a
-  single bounded window. Unknown durations fail explicitly rather than implying
-  whole-episode verification from an intro sample. Original timestamps are kept
-  with FFmpeg `-copyts` and the container start-time adjustment.
+- Embedded references sample up to one minute each near 10%, 50%, and 90% of
+  the timeline. Videos up to three minutes use one window. PyAV demuxes packets
+  from all streams to stop on the video/audio clock, decoding only the chosen
+  subtitle. This avoids subtitle-only FFmpeg reads extending through long quiet
+  scenes while waiting for another subtitle packet. Original timestamps and the
+  container start-time adjustment are preserved. No video/audio is decoded.
+- Extraction has a 30-second budget per parallel window, bounded network reads,
+  and one retry for a failed read within the same budget. Partial failed reads
+  are discarded. Unknown durations fail explicitly; the 90-second host limit
+  still applies. A provider must support usable seeks for remote sampling.
 - Compare subtitle timing overlap in separated regions before accepting an
   output. Reject insufficient agreement, remaining regional drift, worsening
   alignment, altered dialogue, and implausible shifts.
@@ -94,7 +99,10 @@ Every Windows runtime build runs `scripts/test_subtitle_sync_worker.py` in its
 private Python environment before freezing. This includes real FFsubsync tests
 for offsets, common and uncommon framerate drift, and unchanged files, plus
 failure and reference-selection tests. The frozen helper self-test additionally
-checks actual embedded extraction at separated timeline positions.
+checks actual embedded extraction at separated timeline positions, ASS/WebVTT/MP4
+text decoding, and a throttled HTTP fixture with sparse subtitles. The HTTP test
+rejects reading most of a file for a short sample. This does not guarantee every
+provider will permit timely remote extraction.
 
 ## Included notices and versions
 
@@ -105,4 +113,4 @@ links. `bundle-manifest.json` records the versions and self-test status. Retain 
 files when redistributing the runtime, along with Nuvio's existing license and source.
 
 This bundle supports Windows x64. It does not add macOS, Linux or ARM64 subtitle
-runtime packaging, or change the subtitle matching/synchronization algorithm.
+runtime packaging. FFsubsync remains the alignment engine.

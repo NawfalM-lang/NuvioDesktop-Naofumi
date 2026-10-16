@@ -19,6 +19,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -26,7 +27,8 @@ from datetime import timedelta
 
 MAX_SUB_BYTES = 16 * 1024 * 1024
 PROBE_TIMEOUT_S = 8
-EXTRACT_TIMEOUT_S = 18
+EXTRACT_TIMEOUT_S = 30
+MEDIA_READ_TIMEOUT_S = 6
 FETCH_TIMEOUT_S = 12
 MAX_CUES = 100_000
 MAX_TIMELINE_S = 12 * 60 * 60
@@ -196,33 +198,74 @@ def write_cues(path, cues):
 def sample_windows(duration):
     if not math.isfinite(duration) or not 20 <= duration <= MAX_TIMELINE_S:
         raise SyncError('Video duration is unavailable; original subtitle kept')
-    if duration <= 360:
+    if duration <= 180:
         return [(0.0, duration)]
-    return [(max(0.0, duration * fraction - 60), min(duration, duration * fraction + 60))
+    return [(max(0.0, duration * fraction - 30), min(duration, duration * fraction + 30))
             for fraction in (0.1, 0.5, 0.9)]
 
 
 def extract_reference_window(video, index, start, end, output, ffmpeg, timeline_origin=0.0):
-    try:
-        command = [str(ffmpeg), '-hide_banner', '-loglevel', 'error', '-nostdin', '-y']
-        if start > 0:
-            command += ['-ss', str(start)]
-        command += ['-copyts', '-i', video, '-to', str(timeline_origin + end),
-                    '-avoid_negative_ts', 'disabled', '-map', '0:' + str(index),
-                    '-vn', '-an', '-c:s', 'srt', '-f', 'srt', str(output)]
-        result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, timeout=EXTRACT_TIMEOUT_S, check=False)
-    except subprocess.TimeoutExpired:
-        raise SyncError('Embedded subtitle extraction timed out; original subtitle kept') from None
-    if result.returncode or not output.is_file() or output.stat().st_size < 20:
-        raise SyncError('Embedded English subtitles could not be extracted')
-    cues = read_cues(output)
-    # Preserve timestamps while seeking. Rebasing SRT output without copyts can
-    # silently move every cue when the first packet begins before the seek point.
-    for cue in cues:
-        cue.start -= timedelta(seconds=timeline_origin)
-        cue.end -= timedelta(seconds=timeline_origin)
-    return cues
+    """Stop at the media clock, even if the next subtitle packet is much later.
+
+    A subtitle-only FFmpeg output may keep reading past -to while waiting for a
+    sparse subtitle stream. Demux every stream to observe the clock, but decode
+    only the chosen text subtitle; video/audio packets are never decoded.
+    """
+    import av
+    import srt
+
+    deadline = time.monotonic() + EXTRACT_TIMEOUT_S
+    for attempt in range(2):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        cues = []
+        try:
+            with av.open(video, timeout=(min(8, remaining), min(MEDIA_READ_TIMEOUT_S, remaining))) as media:
+                if start > 0:
+                    media.seek(int((timeline_origin + start) * av.time_base), backward=True)
+                # Do not select only subtitles: a quiet scene can otherwise cause
+                # demux to read far past the requested window to find another cue.
+                for packet in media.demux():
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError()
+                    stamp = packet.pts if packet.pts is not None else packet.dts
+                    if stamp is None or packet.time_base is None:
+                        continue
+                    stamp = float(stamp * packet.time_base) - timeline_origin
+                    if packet.stream.type in ('video', 'audio') and stamp >= end:
+                        break
+                    if packet.stream.index != index or not packet.size:
+                        continue
+                    if stamp >= end:
+                        break
+                    subtitle = packet.stream.decode2(packet)
+                    if subtitle is None:
+                        continue
+                    cue_start = stamp + subtitle.start_display_time / 1000.0
+                    cue_end = stamp + subtitle.end_display_time / 1000.0
+                    if cue_end <= start or cue_end <= cue_start:
+                        continue
+                    text = '\n'.join(rect.dialogue.decode('utf-8', errors='replace')
+                                     for rect in subtitle.rects if getattr(rect, 'dialogue', b''))
+                    text = re.sub(r'\{[^}]*\}', '', text).replace(r'\N', '\n').replace(r'\h', ' ')
+                    if text.strip():
+                        cues.append(srt.Subtitle(len(cues) + 1, timedelta(seconds=max(0, cue_start)),
+                                                 timedelta(seconds=cue_end), text))
+                    if len(cues) > MAX_CUES:
+                        raise SyncError('Embedded subtitle has too many dialogue lines')
+            if not cues:
+                raise SyncError('No embedded English dialogue in the sampled section; original subtitle kept')
+            write_cues(output, cues)
+            return read_cues(output)
+        except (av.error.FFmpegError, OSError, TimeoutError):
+            # Retry only a failed read, never a partial reference. All attempts
+            # share the same deadline, with the host retaining its 90s limit.
+            if attempt == 0 and deadline - time.monotonic() > 8:
+                print('SYNC_STAGE: Retrying embedded English read', flush=True)
+                continue
+            break
+    raise SyncError('Embedded English could not be read in time; try another stream or a downloaded copy; original subtitle kept')
 
 
 def embedded_english_reference(video_url, workspace):
@@ -414,6 +457,65 @@ def main(job_file):
     return 0
 
 
+def self_test_remote_extraction(ffmpeg, work):
+    """A sparse subtitle must not make a short request read the entire movie."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    subtitle = work / 'sparse.srt'
+    subtitle.write_text('1\n00:00:10,000 --> 00:00:12,000\none\n\n'
+                        '2\n00:00:15,000 --> 00:00:17,000\ntwo\n\n'
+                        '3\n00:01:30,000 --> 00:01:32,000\nthree\n', encoding='utf-8')
+    video = work / 'sparse.mkv'
+    subprocess.run([str(ffmpeg), '-v', 'error', '-nostdin', '-y', '-f', 'lavfi',
+                    '-i', 'testsrc2=size=320x180:rate=10', '-i', str(subtitle),
+                    '-map', '0:v', '-map', '1:s', '-c:v', 'ffv1', '-c:s', 'srt',
+                    '-metadata:s:s:0', 'language=eng', '-t', '100', str(video)],
+                   check=True, timeout=20, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    payload = video.read_bytes()
+    transferred = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            start = int(self.headers.get('Range', 'bytes=0-').split('=')[1].split('-')[0])
+            count = [0]
+            transferred.append(count)
+            self.send_response(206 if self.headers.get('Range') else 200)
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('Content-Length', str(len(payload) - start))
+            self.send_header('Content-Range', 'bytes %d-%d/%d' % (start, len(payload) - 1, len(payload)))
+            self.end_headers()
+            try:
+                for position in range(start, len(payload), 16384):
+                    chunk = payload[position:position + 16384]
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+                    count[0] += len(chunk)
+                    time.sleep(0.003)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        result = extract_reference_window('http://127.0.0.1:%d/video' % server.server_port,
+                                          1, 0, 20, work / 'remote-reference.srt', ffmpeg)
+        if len(result) != 2 or result[0].start.total_seconds() != 10:
+            raise SyncError('Self-test lost embedded subtitle timestamps over HTTP')
+        if sum(count[0] for count in transferred) >= len(payload) * 0.65:
+            raise SyncError('Self-test read too far past the requested media window')
+        print('REMOTE_READ_OK bytes=%d total=%d' % (sum(count[0] for count in transferred), len(payload)), flush=True)
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
 def self_test():
     """Offline test run by the packager, including actual native libraries."""
     import random
@@ -451,7 +553,7 @@ def self_test():
         vtt = work / 'sample.vtt'
         vtt.write_text('WEBVTT\n\n00:00:01.000 --> 00:00:03.000\nمرحبا بالعالم\n', encoding='utf-8')
         to_srt(vtt, work / 'converted.srt')
-        # Exercise the embedded-English fallback against local media, without a server.
+        # Exercise embedded English extraction against local media, without a server.
         video = work / 'reference.mkv'
         subprocess.run([str(ffmpeg), '-v', 'error', '-nostdin', '-y',
                         '-f', 'lavfi', '-i', 'color=size=16x16:rate=1',
@@ -469,6 +571,20 @@ def self_test():
             if not interior or any(min(abs((cue.start - original.start).total_seconds())
                                        for original in cues) > 0.01 for cue in interior):
                 raise SyncError('Self-test found incorrect timestamps after seeking')
+        # Check native decoding of the text codecs offered by the player.
+        for codec, extension in (('ass', 'mkv'), ('mov_text', 'mp4'), ('webvtt', 'mkv')):
+            converted = work / ('codec-' + codec + '.' + extension)
+            subprocess.run([str(ffmpeg), '-v', 'error', '-nostdin', '-y', '-i', str(video),
+                            '-map', '0:s:1', '-c:s', codec, str(converted)],
+                           check=True, timeout=10, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            a, b = windows[1]
+            converted_cues = extract_reference_window(str(converted), 0, a, b,
+                                                       work / (codec + '.srt'), ffmpeg)
+            interior = [cue for cue in converted_cues if a + 3 < cue.start.total_seconds() < b - 3]
+            if not interior or any(min(abs((cue.start - original.start).total_seconds())
+                                       for original in cues) > 0.01 for cue in interior):
+                raise SyncError('Self-test found incorrect text-codec subtitle timestamps')
+        self_test_remote_extraction(ffmpeg, work)
         no_op = synchronize(reference, reference, work / 'already-aligned.srt')
         if no_op['status'] != 'unchanged':
             raise SyncError('Self-test rejected an already aligned subtitle')
