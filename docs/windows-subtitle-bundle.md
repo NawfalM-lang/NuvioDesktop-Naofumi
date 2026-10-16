@@ -65,8 +65,10 @@ The worker uses FFsubsync 0.5.1 with these additional checks:
 
 - Decode and validate text first, normalize the working copies to UTF-8, and
   require every dialogue line to survive correction. Originals are never edited.
-- Prefer the selected English add-on reference. If it is unavailable or fails
-  validation, try embedded English when the video needs no custom headers.
+- Use the active video’s embedded English text track. English add-on timing is
+  unverified and is never used as an automatic fallback: aligning two external
+  subtitles can leave both out of sync with the video. If embedded English cannot
+  be read (including streams needing custom headers), fail and keep the original.
   Forced-only English tracks are excluded; ordinary dialogue is preferred to SDH.
 - Embedded references sample up to two minutes each near 10%, 50%, and 90% of
   the timeline, in parallel with bounded extraction timeouts. Short videos use a
@@ -75,13 +77,15 @@ The worker uses FFsubsync 0.5.1 with these additional checks:
   with FFmpeg `-copyts` and the container start-time adjustment.
 - Compare subtitle timing overlap in separated regions before accepting an
   output. Reject insufficient agreement, remaining regional drift, worsening
-  alignment, altered dialogue, implausible shifts, and incomplete add-on references.
+  alignment, altered dialogue, and implausible shifts.
   These are conservative heuristics, not an accuracy guarantee or probability.
 - Skip duration-based framerate inference, which can be misleading with sparse
   or incomplete references. If the standard result fails verification, retry
   FFsubsync's continuous framerate search (`--gss`) and apply the same checks.
   Experimental piecewise correction and audio/AI fallbacks are not enabled.
-- Treat an already aligned subtitle as a successful verification.
+- Treat an already aligned subtitle as a successful comparison with embedded English.
+  The embedded track must itself be correctly timed; these checks do not verify
+  dialogue against the audio.
 - Stop the private worker and FFmpeg on cancellation or the 90-second overall
   deadline, and remove temporary inputs, credentials, and logs afterward. Only
   the verified playback SRT remains until application exit.

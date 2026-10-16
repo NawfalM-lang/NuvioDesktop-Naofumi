@@ -24,6 +24,7 @@ internal object DesktopSubtitleHybridSync {
             )
         }
     }
+    @Suppress("UNUSED_PARAMETER") // Retain the controller API; external references cannot verify video timing.
     suspend fun create(
         videoUrl: String,
         subtitleUrl: String,
@@ -31,13 +32,11 @@ internal object DesktopSubtitleHybridSync {
         referenceSubtitleUrl: String?, // NUVIO_FAST_SUBSYNC_V5
     ): String = withContext(Dispatchers.IO) {
         logStage("V4.1 entered Windows sync helper; customHeaders=${videoHeaders.size}")
-        // The initial version accepts signed/direct URLs; ffsubsync does not
-        // currently accept arbitrary Nuvio HTTP request headers for video streams.
-        // English add-on reference requires NO video access, even on secured
-        // streams with extra headers. Embedded fallback still needs direct video.
-        if (videoHeaders.isNotEmpty() && referenceSubtitleUrl == null) {
-            logStage("V5 no English addon reference; media has custom headers")
-            throw IllegalStateException("Stream needs custom headers. Enable an English subtitle addon for fast synchronization")
+        // Embedded reference extraction currently supports direct URLs only.
+        // An external English subtitle cannot establish the video's timing.
+        if (videoHeaders.isNotEmpty()) {
+            logStage("Embedded English unavailable: media has custom headers")
+            throw IllegalStateException("Cannot check embedded English on a stream with custom headers; original subtitle kept")
         }
         val work = Files.createTempDirectory("nuvio-hybrid-sync-")
         val jobFile = work.resolve("job.json")
@@ -55,7 +54,6 @@ internal object DesktopSubtitleHybridSync {
             val safeJob = JsonObject(mapOf(
                 "video_url" to JsonPrimitive(videoUrl),
                 "subtitle_url" to JsonPrimitive(subtitleUrl),
-                "english_reference_url" to JsonPrimitive(referenceSubtitleUrl.orEmpty()),
                 "allow_video_reference" to JsonPrimitive(videoHeaders.isEmpty()),
                 "workspace" to JsonPrimitive(work.toString()),
             ))
