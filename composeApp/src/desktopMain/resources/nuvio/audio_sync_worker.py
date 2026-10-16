@@ -2,7 +2,8 @@
 """Bounded, validated subtitle-to-subtitle alignment for Nuvio Windows.
 
 Arabic (or other selected language) aligns against an English subtitle reference.
-Order: English addon reference -> embedded English text -> explicit failure.
+Reference: embedded English text from the active video, or explicit failure.
+External English subtitles are not trusted as evidence of video timing.
 Remote embedded references sample the beginning, middle and end. Corrections
 must pass independent regional timing checks. No audio analysis or AI model.
 
@@ -194,7 +195,7 @@ def write_cues(path, cues):
 
 def sample_windows(duration):
     if not math.isfinite(duration) or not 20 <= duration <= MAX_TIMELINE_S:
-        raise SyncError('Video duration is unavailable; use a full English add-on reference')
+        raise SyncError('Video duration is unavailable; original subtitle kept')
     if duration <= 360:
         return [(0.0, duration)]
     return [(max(0.0, duration * fraction - 60), min(duration, duration * fraction + 60))
@@ -212,7 +213,7 @@ def extract_reference_window(video, index, start, end, output, ffmpeg, timeline_
         result = subprocess.run(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL, timeout=EXTRACT_TIMEOUT_S, check=False)
     except subprocess.TimeoutExpired:
-        raise SyncError('Embedded subtitle extraction timed out; use an English add-on reference') from None
+        raise SyncError('Embedded subtitle extraction timed out; original subtitle kept') from None
     if result.returncode or not output.is_file() or output.stat().st_size < 20:
         raise SyncError('Embedded English subtitles could not be extracted')
     cues = read_cues(output)
@@ -236,9 +237,9 @@ def embedded_english_reference(video_url, workspace):
         ], capture_output=True, text=True, encoding='utf-8', errors='replace',
             timeout=PROBE_TIMEOUT_S, check=False)
     except subprocess.TimeoutExpired:
-        raise SyncError('Embedded subtitle lookup timed out; use an English add-on reference') from None
+        raise SyncError('Embedded subtitle lookup timed out; original subtitle kept') from None
     if probe.returncode:
-        raise SyncError('Cannot read embedded subtitles; use an English add-on reference')
+        raise SyncError('Cannot read embedded subtitles; original subtitle kept')
     try:
         metadata = json.loads(probe.stdout)
         streams = metadata.get('streams', [])
@@ -255,7 +256,7 @@ def embedded_english_reference(video_url, workspace):
                and not re.search(r'\b(forced|signs(?: only)?)\b',
                                  str(stream.get('tags', {}).get('title', '')), re.I)]
     if not english:
-        raise SyncError('No complete embedded English text track found; use an English add-on reference')
+        raise SyncError('No complete embedded English text track found; original subtitle kept')
     english.sort(key=lambda stream: bool(stream.get('disposition', {}).get('hearing_impaired')))
     index = int(english[0]['index'])
     windows = sample_windows(duration)
@@ -398,24 +399,14 @@ def main(job_file):
     work.mkdir(parents=True, exist_ok=True)
     selected = fetch_subtitle(job['subtitle_url'], work, 'selected')
     selected = to_srt(selected, work / 'selected.srt')
-    english_url = job.get('english_reference_url') or ''
-    failure = None
-    if english_url:
-        try:
-            print('SYNC_STAGE: Checking English add-on reference', flush=True)
-            reference = fetch_subtitle(english_url, work, 'reference-addon')
-            reference = to_srt(reference, work / 'reference-converted.srt')
-            report = synchronize(reference, selected, work / 'synced.srt')
-            report['reference'] = 'addon'
-        except SyncError as error:
-            failure = error
-    if not english_url or failure is not None:
-        if not job.get('allow_video_reference', True):
-            raise SyncError('English reference could not be verified; choose another matching English subtitle')
-        print('SYNC_STAGE: Checking embedded English across the episode', flush=True)
-        reference, windows = embedded_english_reference(job.get('video_url', ''), work)
-        report = synchronize(reference, selected, work / 'synced.srt', windows=windows)
-        report['reference'] = 'embedded-sampled'
+    if not job.get('allow_video_reference', True):
+        raise SyncError('Cannot check embedded English on a stream with custom headers; original subtitle kept')
+    # An add-on can match the release yet have a constant timing error. Agreement
+    # with it cannot establish video timing, so never use it as a fallback here.
+    print('SYNC_STAGE: Checking embedded English across the episode', flush=True)
+    reference, windows = embedded_english_reference(job.get('video_url', ''), work)
+    report = synchronize(reference, selected, work / 'synced.srt', windows=windows)
+    report['reference'] = 'embedded-sampled'
     # Report contains numeric timing diagnostics only, never URLs or subtitle dialogue.
     (work / 'sync-report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
     print('SYNC_UNCHANGED' if report['unchanged'] else 'SYNC_CORRECTED', flush=True)

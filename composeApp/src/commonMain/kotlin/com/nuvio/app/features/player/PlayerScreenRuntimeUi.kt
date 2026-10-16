@@ -1083,21 +1083,8 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                             isLoading = false,
                         )
                         println("NUVIO_HYBRID_SYNC_V41: running worker")
-                        // NUVIO_FAST_SUBSYNC_V5: reference is an English addon subtitle
-                        // for this episode, ordered by existing V2 release matching.
-                        val englishReferenceUrl = addonSubtitles.filter { candidate ->
-                            SubtitleLanguageMatching.matchesLanguageCode(candidate.language, "en") &&
-                                !addonSubtitleIsForced(candidate) &&
-                                candidate.url != selected.url &&
-                                (candidate.url.startsWith("https://") || candidate.url.startsWith("http://"))
-                        }.rankedForRelease(activeStreamFilename ?: activeTorrentFilename)
-                            .firstOrNull()?.url
                         subtitleAutoSyncState = subtitleAutoSyncState.copy(
-                            errorMessage = if (englishReferenceUrl != null) {
-                                "Aligning subtitles using an English add-on reference…"
-                            } else {
-                                "Checking embedded English across the episode (up to 90s)…"
-                            },
+                            errorMessage = "Checking embedded English across the episode (up to 90s)…",
                             isLoading = false,
                         )
                         val subtitleUrl = selected.url
@@ -1107,7 +1094,7 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                             try {
                                 NuvioToastController.show("Subtitle timing verification started")
                                 val syncedUri = controller.createAutoSyncedSubtitle(
-                                    videoUrl, subtitleUrl, headers, englishReferenceUrl,
+                                    videoUrl, subtitleUrl, headers,
                                 )
                                     ?: error("Windows synchronizer not available")
                                 if (playerController === controller && activeSourceUrl == videoUrl &&
@@ -1119,8 +1106,8 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                                     subtitleDelayMs = 0
                                     controller.setSubtitleDelayMs(0)
                                     println("NUVIO_HYBRID_SYNC_V41: completed successfully")
-                                    subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Subtitle timing verified and loaded")
-                                    NuvioToastController.show("Verified subtitle loaded")
+                                    subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Subtitle aligned to embedded English and loaded")
+                                    NuvioToastController.show("Subtitle aligned to embedded English")
                                 }
                             } catch (error: kotlinx.coroutines.CancellationException) {
                                 throw error

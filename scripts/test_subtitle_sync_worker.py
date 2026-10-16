@@ -35,13 +35,15 @@ def cues(seed=932, scale=1.0, offset=0.0, count=120):
 
 
 class AlignmentTests(unittest.TestCase):
-    def test_full_job_downloads_and_validates_without_video_access(self):
+    def test_full_job_ignores_wrong_addon_and_aligns_to_embedded_english(self):
         payloads = {'/selected': srt.compose(cues(offset=2)).encode('utf-8'),
-                    '/reference': srt.compose(cues()).encode('utf-8')}
+                    '/reference': srt.compose(cues(offset=5)).encode('utf-8')}
+        requested = []
 
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
-                body = payloads[self.path.split('?')[0]]
+                requested.append(self.path.split('?')[0])
+                body = payloads[requested[-1]]
                 self.send_response(200)
                 self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
@@ -60,15 +62,24 @@ class AlignmentTests(unittest.TestCase):
                 job = root / 'job.json'
                 job.write_text(json.dumps({'workspace': tmp, 'subtitle_url': origin + '/selected?token=secret',
                                            'english_reference_url': origin + '/reference?token=secret',
-                                           'allow_video_reference': False}))
+                                           'video_url': 'file:///movie.mkv'}))
                 stdout = io.StringIO()
-                with redirect_stdout(stdout):
+                reference = root / 'embedded.srt'
+                worker.write_cues(reference, cues())
+                with patch.object(worker, 'embedded_english_reference',
+                                  return_value=(reference, [(0, 200), (200, 400), (400, 700)])) as embedded, \
+                     redirect_stdout(stdout):
                     self.assertEqual(worker.main(job), 0)
+                for actual, expected in zip(worker.read_cues(root / 'synced.srt'), cues()):
+                    self.assertLess(abs((actual.start - expected.start).total_seconds()), 0.12)
+                embedded.assert_called_once()
+                self.assertEqual(requested, ['/selected'])
                 self.assertIn('SYNC_OK', stdout.getvalue())
                 self.assertNotIn('secret', stdout.getvalue())
                 report = (root / 'sync-report.json').read_text()
                 self.assertNotIn('secret', report)
                 self.assertEqual(json.loads(report)['status'], 'corrected')
+                self.assertEqual(json.loads(report)['reference'], 'embedded-sampled')
                 self.assertEqual(len(worker.read_cues(root / 'synced.srt')), 120)
         finally:
             server.shutdown()
@@ -194,7 +205,7 @@ class AlignmentTests(unittest.TestCase):
                     worker.synchronize(source, source, root / 'output.srt')
             self.assertFalse((root / 'output.srt').exists())
 
-    def test_bad_addon_falls_back_to_embedded_when_video_access_is_allowed(self):
+    def test_embedded_reference_is_used_without_fetching_addon(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
             source = root / 'source.srt'
@@ -203,11 +214,12 @@ class AlignmentTests(unittest.TestCase):
             job.write_text(json.dumps({'workspace': tmp, 'subtitle_url': 'https://private/input',
                                        'english_reference_url': 'https://private/reference', 'video_url': 'https://private/video'}))
             expected = {'unchanged': True, 'status': 'unchanged'}
-            with patch.object(worker, 'fetch_subtitle', side_effect=[source, worker.SyncError('Reference unavailable')]), \
+            with patch.object(worker, 'fetch_subtitle', return_value=source) as fetch, \
                  patch.object(worker, 'embedded_english_reference', return_value=(source, [(0, 100)])) as embedded, \
                  patch.object(worker, 'synchronize', return_value=expected), redirect_stdout(io.StringIO()):
                 self.assertEqual(worker.main(job), 0)
             embedded.assert_called_once()
+            fetch.assert_called_once()
             report = (root / 'sync-report.json').read_text()
             self.assertNotIn('private', report)
             self.assertEqual(json.loads(report)['reference'], 'embedded-sampled')
@@ -220,11 +232,56 @@ class AlignmentTests(unittest.TestCase):
             job = root / 'job.json'
             job.write_text(json.dumps({'workspace': tmp, 'subtitle_url': 'https://private/input',
                                        'english_reference_url': 'https://private/reference', 'allow_video_reference': False}))
-            with patch.object(worker, 'fetch_subtitle', side_effect=[source, worker.SyncError('Reference unavailable')]), \
+            with patch.object(worker, 'fetch_subtitle', return_value=source) as fetch, \
                  patch.object(worker, 'embedded_english_reference') as embedded, redirect_stdout(io.StringIO()):
                 with self.assertRaises(worker.SyncError):
                     worker.main(job)
             embedded.assert_not_called()
+
+    def test_missing_embedded_reference_never_trusts_addon_or_reports_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            source = root / 'source.srt'
+            worker.write_cues(source, cues(offset=2))
+            original = source.read_bytes()
+            job = root / 'job.json'
+            job.write_text(json.dumps({'workspace': tmp, 'subtitle_url': 'https://private/input',
+                                       'english_reference_url': 'https://private/wrong-reference',
+                                       'video_url': 'https://private/video'}))
+            stdout = io.StringIO()
+            with patch.object(worker, 'fetch_subtitle', return_value=source) as fetch, \
+                 patch.object(worker, 'embedded_english_reference',
+                              side_effect=worker.SyncError('No complete embedded English text track found')), \
+                 patch.object(worker, 'synchronize') as sync, redirect_stdout(stdout):
+                with self.assertRaisesRegex(worker.SyncError, 'complete embedded English'):
+                    worker.main(job)
+            fetch.assert_called_once()
+            sync.assert_not_called()
+            self.assertNotIn('SYNC_OK', stdout.getvalue())
+            self.assertFalse((root / 'synced.srt').exists())
+            self.assertFalse((root / 'sync-report.json').exists())
+            self.assertEqual(source.read_bytes(), original)
+
+    def test_already_aligned_arabic_is_not_shifted_to_wrong_addon(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            source, reference = root / 'source.srt', root / 'embedded.srt'
+            worker.write_cues(source, cues())
+            worker.write_cues(reference, cues())
+            job = root / 'job.json'
+            job.write_text(json.dumps({'workspace': tmp, 'subtitle_url': 'https://private/input',
+                                       'english_reference_url': 'https://private/wrong-reference',
+                                       'video_url': 'file:///movie.mkv'}))
+            with patch.object(worker, 'fetch_subtitle', return_value=source) as fetch, \
+                 patch.object(worker, 'embedded_english_reference',
+                              return_value=(reference, [(0, 200), (200, 400), (400, 700)])), \
+                 redirect_stdout(io.StringIO()):
+                self.assertEqual(worker.main(job), 0)
+            fetch.assert_called_once()
+            self.assertEqual(json.loads((root / 'sync-report.json').read_text())['status'], 'unchanged')
+            for actual, expected in zip(worker.read_cues(root / 'synced.srt'), worker.read_cues(source)):
+                self.assertEqual(actual.start, expected.start)
+                self.assertEqual(actual.content, expected.content)
 
     def test_download_errors_do_not_expose_urls(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -251,7 +308,7 @@ class AlignmentTests(unittest.TestCase):
                 worker.embedded_english_reference(str(video), root)
             self.assertEqual(extract.call_args.args[1], 2)
 
-    def test_forced_only_video_requires_an_addon_reference(self):
+    def test_forced_only_video_cannot_verify_alignment(self):
         metadata = {'format': {'duration': '90'}, 'streams': [
             {'index': 1, 'codec_name': 'subrip', 'tags': {'language': 'eng'}, 'disposition': {'forced': 1}},
         ]}

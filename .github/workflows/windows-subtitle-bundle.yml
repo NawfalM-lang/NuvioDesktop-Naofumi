@@ -2,7 +2,7 @@ name: Windows bundled subtitle runtime
 
 on:
   push:
-    branches: [bundle-windows-subtitle-sync, harden-subtitle-sync]
+    branches: [bundle-windows-subtitle-sync, harden-subtitle-sync, fix-subtitle-reference-priority]
   workflow_dispatch:
 
 permissions:
