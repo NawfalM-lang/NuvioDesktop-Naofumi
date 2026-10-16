@@ -34,7 +34,10 @@ py -3.13 scripts/build_windows_subtitle_sync.py
 ## Runtime discovery
 
 Installed builds launch
-`<Compose resources>/windows/subtitle-sync/nuvio-subtitle-sync.exe` directly.
+`<Compose resources>/subtitle-sync/nuvio-subtitle-sync.exe` directly.
+Compose copies the contents of the build-time `app-resources/windows` folder into
+the installed resources root; the `windows` selector folder is not retained.
+The launcher also accepts the old nested layout for manually staged installations.
 All files in that directory, including `_internal`, must stay together. FFmpeg is
 resolved from `_internal/bin`, before system executables. A missing installed
 bundle produces a repair error instead of asking end users to install Python.
@@ -48,8 +51,12 @@ Each bundle build executes `--self-test` with Python-related environment variabl
 removed and PATH limited to Windows system tools. It checks real FFsubsync imports,
 corrects a known two-second offset, preserves Arabic text, converts WebVTT, probes
 local media and extracts an embedded English subtitle. Temporary paths include
-spaces. MSI verification extracts the actual installer and repeats this test on
-the extracted executable. CI success does not replace playback testing of the
+spaces. The resource preparation task checks the flattened layout and required
+runtime files before packaging. MSI verification extracts the actual installer,
+requires the executable specifically under `app/resources/subtitle-sync`, and
+repeats the helper self-test. Launcher regression tests cover installed and legacy
+layouts, explicit overrides, spaces, and incomplete installs.
+CI success does not replace playback testing of the
 installed application on a separate Windows PC.
 
 ## Included notices and versions
