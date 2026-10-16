@@ -739,6 +739,7 @@ val buildWindowsSubtitleSync = tasks.register<Exec>("buildWindowsSubtitleSync") 
     val script = rootProject.layout.projectDirectory.file("scripts/build_windows_subtitle_sync.py")
     inputs.file(script)
     inputs.file(rootProject.layout.projectDirectory.file("scripts/subtitle-sync-requirements.txt"))
+    inputs.file(rootProject.layout.projectDirectory.file("scripts/test_subtitle_sync_worker.py"))
     inputs.dir(rootProject.layout.projectDirectory.dir("scripts/pyinstaller-hooks"))
     inputs.file(layout.projectDirectory.file("src/desktopMain/resources/nuvio/audio_sync_worker.py"))
     val output = windowsSubtitleAppResources.map { it.dir("windows/subtitle-sync") }

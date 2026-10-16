@@ -1079,7 +1079,7 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                     else -> {
                         hybridSyncRunning = true
                         subtitleAutoSyncState = subtitleAutoSyncState.copy(
-                            errorMessage = "Analyzing video… this may take 1–3 minutes",
+                            errorMessage = "Checking subtitle timing…",
                             isLoading = false,
                         )
                         println("NUVIO_HYBRID_SYNC_V41: running worker")
@@ -1096,7 +1096,7 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                             errorMessage = if (englishReferenceUrl != null) {
                                 "Aligning subtitles using an English add-on reference…"
                             } else {
-                                "Looking for embedded English subtitles (up to 30s)…"
+                                "Checking embedded English across the episode (up to 90s)…"
                             },
                             isLoading = false,
                         )
@@ -1105,7 +1105,7 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                         val headers = sanitizePlaybackHeaders(activeSourceHeaders)
                         scope.launch {
                             try {
-                                NuvioToastController.show("Fast subtitle-to-subtitle synchronization started")
+                                NuvioToastController.show("Subtitle timing verification started")
                                 val syncedUri = controller.createAutoSyncedSubtitle(
                                     videoUrl, subtitleUrl, headers, englishReferenceUrl,
                                 )
@@ -1119,8 +1119,8 @@ private fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: D
                                     subtitleDelayMs = 0
                                     controller.setSubtitleDelayMs(0)
                                     println("NUVIO_HYBRID_SYNC_V41: completed successfully")
-                                    subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Synchronized subtitle loaded successfully")
-                                    NuvioToastController.show("Synchronized subtitle loaded")
+                                    subtitleAutoSyncState = subtitleAutoSyncState.copy(errorMessage = "Subtitle timing verified and loaded")
+                                    NuvioToastController.show("Verified subtitle loaded")
                                 }
                             } catch (error: kotlinx.coroutines.CancellationException) {
                                 throw error

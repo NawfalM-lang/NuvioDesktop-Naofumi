@@ -59,6 +59,39 @@ layouts, explicit overrides, spaces, and incomplete installs.
 CI success does not replace playback testing of the
 installed application on a separate Windows PC.
 
+## Alignment reliability
+
+The worker uses FFsubsync 0.5.1 with these additional checks:
+
+- Decode and validate text first, normalize the working copies to UTF-8, and
+  require every dialogue line to survive correction. Originals are never edited.
+- Prefer the selected English add-on reference. If it is unavailable or fails
+  validation, try embedded English when the video needs no custom headers.
+  Forced-only English tracks are excluded; ordinary dialogue is preferred to SDH.
+- Embedded references sample up to two minutes each near 10%, 50%, and 90% of
+  the timeline, in parallel with bounded extraction timeouts. Short videos use a
+  single bounded window. Unknown durations fail explicitly rather than implying
+  whole-episode verification from an intro sample. Original timestamps are kept
+  with FFmpeg `-copyts` and the container start-time adjustment.
+- Compare subtitle timing overlap in separated regions before accepting an
+  output. Reject insufficient agreement, remaining regional drift, worsening
+  alignment, altered dialogue, implausible shifts, and incomplete add-on references.
+  These are conservative heuristics, not an accuracy guarantee or probability.
+- Skip duration-based framerate inference, which can be misleading with sparse
+  or incomplete references. If the standard result fails verification, retry
+  FFsubsync's continuous framerate search (`--gss`) and apply the same checks.
+  Experimental piecewise correction and audio/AI fallbacks are not enabled.
+- Treat an already aligned subtitle as a successful verification.
+- Stop the private worker and FFmpeg on cancellation or the 90-second overall
+  deadline, and remove temporary inputs, credentials, and logs afterward. Only
+  the verified playback SRT remains until application exit.
+
+Every Windows runtime build runs `scripts/test_subtitle_sync_worker.py` in its
+private Python environment before freezing. This includes real FFsubsync tests
+for offsets, common and uncommon framerate drift, and unchanged files, plus
+failure and reference-selection tests. The frozen helper self-test additionally
+checks actual embedded extraction at separated timeline positions.
+
 ## Included notices and versions
 
 FFmpeg's ZIP is pinned by URL and SHA-256; a mismatched download fails the build.
