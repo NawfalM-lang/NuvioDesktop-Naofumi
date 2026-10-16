@@ -4,7 +4,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -45,24 +44,27 @@ internal object DesktopSubtitleHybridSync {
         val workerFile = work.resolve("audio_sync_worker.py")
         val logFile = work.resolve("output.log")
         val output = work.resolve("synced.srt")
-        logStage("V4.1 staging synchronization worker")
-        val resource = DesktopSubtitleHybridSync::class.java.classLoader
-            .getResourceAsStream("nuvio/audio_sync_worker.py")
-            ?: throw IllegalStateException("Hybrid sync resource not packaged; rebuild the desktop app")
-        resource.use { source -> Files.newOutputStream(workerFile).use { destination -> source.copyTo(destination) } }
-        val safeJob = JsonObject(mapOf(
-            "video_url" to JsonPrimitive(videoUrl),
-            "subtitle_url" to JsonPrimitive(subtitleUrl),
-            "english_reference_url" to JsonPrimitive(referenceSubtitleUrl.orEmpty()),
-            "workspace" to JsonPrimitive(work.toString()),
-        ))
-        Files.writeString(jobFile, safeJob.toString(), StandardCharsets.UTF_8)
-        jobFile.toFile().deleteOnExit()
-        workerFile.toFile().deleteOnExit()
-        logFile.toFile().deleteOnExit()
-        work.toFile().deleteOnExit()
-        output.toFile().deleteOnExit()
+        var runningProcess: Process? = null
+        var keepOutput = false
         try {
+            logStage("V4.1 staging synchronization worker")
+            val resource = DesktopSubtitleHybridSync::class.java.classLoader
+                .getResourceAsStream("nuvio/audio_sync_worker.py")
+                ?: throw IllegalStateException("Hybrid sync resource not packaged; rebuild the desktop app")
+            resource.use { source -> Files.newOutputStream(workerFile).use { destination -> source.copyTo(destination) } }
+            val safeJob = JsonObject(mapOf(
+                "video_url" to JsonPrimitive(videoUrl),
+                "subtitle_url" to JsonPrimitive(subtitleUrl),
+                "english_reference_url" to JsonPrimitive(referenceSubtitleUrl.orEmpty()),
+                "allow_video_reference" to JsonPrimitive(videoHeaders.isEmpty()),
+                "workspace" to JsonPrimitive(work.toString()),
+            ))
+            Files.writeString(jobFile, safeJob.toString(), StandardCharsets.UTF_8)
+            jobFile.toFile().deleteOnExit()
+            workerFile.toFile().deleteOnExit()
+            logFile.toFile().deleteOnExit()
+            work.toFile().deleteOnExit()
+            output.toFile().deleteOnExit()
             val command = DesktopSubtitleSyncRuntime.command(workerFile, jobFile)
             logStage(if (command.first() == "py") "Launching development Python" else "Launching bundled subtitle runtime")
             val process = try {
@@ -77,13 +79,8 @@ internal object DesktopSubtitleHybridSync {
                     error,
                 )
             }
-            val finished = process.waitFor(55, TimeUnit.SECONDS)
-            if (!finished) {
-                logStage("V5 timed out after 55 seconds")
-                process.descendants().forEach { it.destroyForcibly() }
-                process.destroyForcibly()
-                throw IllegalStateException("Fast subtitle sync timed out. Supply an English addon subtitle reference")
-            }
+            runningProcess = process
+            awaitSubtitleSyncProcess(process)
             if (process.exitValue() != 0 || !Files.isRegularFile(output) || Files.size(output) < 20L) {
                 val diagnostic = runCatching { Files.readString(logFile).takeLast(600) }.getOrDefault("")
                 val failure = diagnostic.lineSequence()
@@ -94,11 +91,24 @@ internal object DesktopSubtitleHybridSync {
                     .substringBefore("http").take(200))
                 throw IllegalStateException(failure ?: "Hybrid sync failed; check Python/ffmpeg installation or stream access")
             }
-            logStage("V4.1 output ready")
+            logStage("Validated subtitle output ready")
+            keepOutput = true
             return@withContext output.toUri().toString()
         } finally {
-            // The job file contains signed URLs. Remove it immediately.
-            Files.deleteIfExists(jobFile)
+            // Cancellation/timeout must stop FFmpeg too, not just abandon a worker.
+            runningProcess?.takeIf { it.isAlive }?.let { process ->
+                process.descendants().use { children -> children.forEach { it.destroyForcibly() } }
+                process.destroyForcibly()
+                process.waitFor(2, TimeUnit.SECONDS)
+            }
+            // Retain only the validated output needed by playback. The job contains URLs.
+            runCatching {
+                Files.walk(work).use { paths ->
+                    paths.sorted(Comparator.reverseOrder()).forEach { path ->
+                        if (!keepOutput || (path != output && path != work)) Files.deleteIfExists(path)
+                    }
+                }
+            }
         }
     }
 }

@@ -89,6 +89,7 @@ def main():
         venv.EnvBuilder(with_pip=True).create(environment)
     run([python, '-m', 'pip', 'install', '--disable-pip-version-check',
          '-r', ROOT / 'scripts/subtitle-sync-requirements.txt'])
+    run([python, ROOT / 'scripts/test_subtitle_sync_worker.py'])
     ffmpeg = extract_ffmpeg(download_ffmpeg(work / 'downloads'), work / 'ffmpeg')
     notices = work / 'notices'
     notices.mkdir(exist_ok=True)

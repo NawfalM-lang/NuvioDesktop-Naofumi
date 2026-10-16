@@ -38,6 +38,7 @@ scripts/*
 !scripts/subtitle-sync-requirements.txt
 !scripts/pyinstaller-hooks/
 !scripts/test_windows_subtitle_sync.py
+!scripts/test_subtitle_sync_worker.py
 __pycache__/
 *.py[cod]
 iosApp/Configuration/DeviceSigning.local.json
